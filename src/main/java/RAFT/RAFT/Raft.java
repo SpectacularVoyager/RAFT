@@ -107,6 +107,9 @@ public class Raft implements Server {
                 //CHANGE STATE TO LEADER
                 changeState(RaftState.LEADER);
                 logger.logf("WON ELECTION WITH (%d/%d) VOTES\n", votesRecieved, servers.size() + 1);
+            } else {
+                logger.logf("LOST ELECTION WITH (%d/%d) VOTES\n", votesRecieved, servers.size() + 1);
+
             }
         }
     }
@@ -117,8 +120,8 @@ public class Raft implements Server {
         synchronized (lock) {
             //LOG STUFF
 
-            if(commitIndex>req.getLastLogIndex()){
-                return rejectVote(req,"OLD LOGS");
+            if (commitIndex > req.getLastLogIndex()) {
+                return rejectVote(req, "OLD LOGS");
             }
             if (term < req.getTerm()) {
                 if (state != RaftState.FOLLOWER) {
@@ -212,15 +215,16 @@ public class Raft implements Server {
     }
 
     public synchronized void changeState(RaftState state) {
+        int b=0,h=0;
         switch (state) {
             case FOLLOWER -> {
-                logger.setFormat(AnsiColor.WHITE, 0, 1);
+                logger.setFormat(AnsiColor.WHITE, b, h);
             }
             case CANDIDATE -> {
-                logger.setFormat(AnsiColor.GREEN, 0, 1);
+                logger.setFormat(AnsiColor.GREEN, b,h);
             }
             case LEADER -> {
-                logger.setFormat(AnsiColor.BLUE, 0, 1);
+                logger.setFormat(AnsiColor.BLUE, b,h);
             }
         }
         logger.log(id + "\tCHANGED STATE TO:" + state);

@@ -23,7 +23,7 @@ public class TcpImpl {
             socketChannel.write(out);
 
 
-        } catch (IOException _) {
+        } catch (IOException e) {
             // COULD NOT CONNECT
 //            System.out.println();
             return false;

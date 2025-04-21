@@ -12,7 +12,7 @@ import java.nio.channels.ByteChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 
-@Slf4j
+
 public class RPCManagerTCP implements Runnable {
 
     Raft r;
