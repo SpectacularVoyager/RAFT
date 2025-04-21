@@ -3,29 +3,30 @@ package RAFT.RAFT;
 import Logging.AnsiColor;
 import Logging.RaftLogger;
 import RAFT.RPC.*;
-import RAFT.RPC.Type.HeartBeatRequest;
-import RAFT.RPC.Type.HeartBeatResponse;
-import RAFT.RPC.Type.RequestVoteRequest;
-import RAFT.RPC.Type.RequestVoteResponse;
+import RAFT.RPC.TCPSocket.RPCManagerTCP;
+import RAFT.RPC.Type.*;
 import lombok.Getter;
 import lombok.NonNull;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 public class Raft implements Server {
+    @Getter
     RaftLogger logger = new RaftLogger();
-
     final Object lock = new Object();
-
     @Getter
     private volatile ID id;
+    @Getter
+    private volatile Config config;
     private volatile RaftState state = RaftState.FOLLOWER;
     private volatile long term = 0;
     private volatile ID votedFor = null;
     ScheduledThreadPoolExecutor executor;
     List<Server> servers;
+    RPCManagerTCP manager;
 
     public void startElection() {
         for (Server x : servers) {
@@ -39,18 +40,21 @@ public class Raft implements Server {
         }
     }
 
+
+
     @Override
     public @NonNull HeartBeatResponse sendHeartBeat(HeartBeatRequest req) {
-        return new HeartBeatResponse(this.term,true);
+        return new HeartBeatResponse(this.term, true);
     }
 
     @Override
     public @NonNull RequestVoteResponse requestVote(RequestVoteRequest req) {
-        return new RequestVoteResponse(this.term,true);
+        return new RequestVoteResponse(this.term, true);
     }
 
 
     private void mainLoop() {
+//        System.out.println("EY");
         switch (state) {
             case LEADER -> {
 
@@ -72,8 +76,10 @@ public class Raft implements Server {
 
     }
 
-    public Raft() {
+    public Raft(Config config) throws IOException {
+        this.config = config;
         changeState(RaftState.FOLLOWER);
+        manager = new RPCManagerTCP(this);
         logger.log("STARTING RAFT");
         try {
             executor = new ScheduledThreadPoolExecutor(5);
@@ -82,6 +88,7 @@ public class Raft implements Server {
             throw new RuntimeException("THREAD SIZE < 0");
         }
         executor.schedule(this::mainLoop, 150, TimeUnit.MILLISECONDS);
+        executor.execute(manager);
     }
 
     public synchronized long getDelay() {

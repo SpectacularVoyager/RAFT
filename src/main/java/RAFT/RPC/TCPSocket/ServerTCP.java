@@ -7,6 +7,7 @@ import lombok.Getter;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
 public class ServerTCP implements Server {
@@ -17,36 +18,21 @@ public class ServerTCP implements Server {
     @Getter
     private final ID id;
 
-    private <REQ extends RPCMessage, RES extends RPCMessage> boolean RPC(REQ req, RES res) {
-        SocketChannel socketChannel;
-        try {
-            socketChannel = SocketChannel.open();
-            socketChannel.connect(new InetSocketAddress(id.getHost(), id.getPort()));
+    private static int RPC_ID = 1;
 
-        } catch (IOException _) {
-            // COULD NOT CONNECT
-            return false;
-        }
-        try {
-            req.put(socketChannel);
-            res.get(socketChannel);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return true;
-    }
+
 
     @Override
     public HeartBeatResponse sendHeartBeat(HeartBeatRequest req) {
         HeartBeatResponse res = new HeartBeatResponse();
-        RPC(req, res);
+        TcpImpl.RPC(RPC_TYPE.HEARTBEAT,id, req, res);
         return res;
     }
 
     @Override
     public RequestVoteResponse requestVote(RequestVoteRequest req) {
         RequestVoteResponse res = new RequestVoteResponse();
-        RPC(req, res);
+        TcpImpl.RPC(RPC_TYPE.REQUEST_VOTE,id, req, res);
         return res;
     }
 }

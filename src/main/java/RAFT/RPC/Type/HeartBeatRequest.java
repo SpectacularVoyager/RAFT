@@ -3,13 +3,16 @@ package RAFT.RPC.Type;
 import RAFT.RAFT.ID;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
 import java.nio.channels.Channel;
 
 @Getter
 @AllArgsConstructor
+@NoArgsConstructor
 public class HeartBeatRequest implements RPCMessage{
     long leaderTerm;
     ID leaderID;
@@ -20,11 +23,13 @@ public class HeartBeatRequest implements RPCMessage{
 
     @Override
     public void put(ByteChannel channel) throws IOException {
-
     }
 
     @Override
     public void get(ByteChannel channel) throws IOException {
 
+    }
+    public HeartBeatRequest(ByteChannel channel) throws IOException {
+        get(channel);
     }
 }
