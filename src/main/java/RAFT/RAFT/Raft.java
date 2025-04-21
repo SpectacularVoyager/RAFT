@@ -4,6 +4,7 @@ import Logging.AnsiColor;
 import Logging.RaftLogger;
 import RAFT.RPC.*;
 import RAFT.RPC.TCPSocket.RPCManagerTCP;
+import RAFT.RPC.TCPSocket.ServerTCP;
 import RAFT.RPC.Type.*;
 import lombok.Getter;
 import lombok.NonNull;
@@ -24,6 +25,7 @@ public class Raft implements Server {
     private volatile RaftState state = RaftState.FOLLOWER;
     private volatile long term = 0;
     private volatile ID votedFor = null;
+    private volatile long commitIndex = 0;
     ScheduledThreadPoolExecutor executor;
     List<Server> servers;
     RPCManagerTCP manager;
@@ -37,18 +39,27 @@ public class Raft implements Server {
     public void sendHeartBeats() {
         for (Server x : servers) {
             //SEND HEARTBEAT
+            HeartBeatRequest request = new HeartBeatRequest();
+            request.setLeaderCommit(commitIndex);
+            request.setLeaderID(id);
+            request.setLeaderTerm(term);
+            request.setPrevLogIndex(0);
+            request.setPrevLogTerm(0);
+            x.sendHeartBeat(request);
         }
     }
 
 
-
     @Override
     public @NonNull HeartBeatResponse sendHeartBeat(HeartBeatRequest req) {
+        logger.log("RECIEVED HEARTBEAT");
+        logger.log(req.toString());
         return new HeartBeatResponse(this.term, true);
     }
 
     @Override
     public @NonNull RequestVoteResponse requestVote(RequestVoteRequest req) {
+        logger.log("RECIEVED REQUEST VOTE");
         return new RequestVoteResponse(this.term, true);
     }
 
@@ -72,12 +83,15 @@ public class Raft implements Server {
                 }
             }
         }
+        sendHeartBeats();
         executor.schedule(this::mainLoop, getDelay(), TimeUnit.MILLISECONDS);
 
     }
 
     public Raft(Config config) throws IOException {
+        this.id=config.id;
         this.config = config;
+        this.servers=this.config.servers;
         changeState(RaftState.FOLLOWER);
         manager = new RPCManagerTCP(this);
         logger.log("STARTING RAFT");

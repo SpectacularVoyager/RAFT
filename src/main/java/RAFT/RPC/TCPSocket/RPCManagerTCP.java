@@ -1,16 +1,18 @@
 package RAFT.RPC.TCPSocket;
 
 import RAFT.RAFT.Raft;
-import RAFT.RPC.Type.HeartBeatRequest;
-import RAFT.RPC.Type.HeartBeatResponse;
-import RAFT.RPC.Type.RPC_TYPE;
+import RAFT.RPC.Type.*;
 import lombok.NonNull;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.ByteChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 
+@Slf4j
 public class RPCManagerTCP implements Runnable {
 
     Raft r;
@@ -26,32 +28,40 @@ public class RPCManagerTCP implements Runnable {
     public void run() {
         try {
             serverSocketChannel = ServerSocketChannel.open();
-            serverSocketChannel.socket().bind(new InetSocketAddress(r.getConfig().getPort()));
+            serverSocketChannel.socket().bind(new InetSocketAddress(r.getConfig().getId().getPort()));
             while (true) {
                 socketChannel = serverSocketChannel.accept();
-                System.out.println("BRRUG");
-                RPC_TYPE type = RPC_TYPE.NONE;
-                type.get(socketChannel);
-                handleRPC(type, socketChannel);
+                System.out.println("RECIEVED RPC");
+                ByteBuffer buffer= ByteBuffer.allocate(4);
+                buffer.clear();
+                socketChannel.read(buffer);
+                buffer.flip();
+
+                handleRPC(buffer.getInt(), socketChannel);
                 socketChannel.close();
             }
         } catch (IOException e) {
+            System.out.println(e);
             throw new RuntimeException(e);
         }
     }
 
-    void handleRPC(@NonNull RPC_TYPE type, SocketChannel chan) {
-        switch (type) {
-            case HEARTBEAT -> {
+    void handleRPC(@NonNull int type, SocketChannel chan) throws IOException {
 
+        switch (type) {
+            case RPC.HEARTBEAT -> {
                 HeartBeatRequest req = new HeartBeatRequest(chan);
                 HeartBeatResponse resp = r.sendHeartBeat(req);
+                resp.put(chan);
             }
-            case REQUEST_VOTE -> {
-
+            case RPC.REQUEST_VOTE -> {
+                RequestVoteRequest req = new RequestVoteRequest(chan);
+                RequestVoteResponse resp = r.requestVote(req);
+                resp.put(chan);
             }
             default -> {
-                r.getLogger().logf("INVALID RPC FUNCTION[%d]", type.get());
+                r.getLogger().logf("INVALID RPC FUNCTION[%d]\n", type);
+
             }
         }
     }

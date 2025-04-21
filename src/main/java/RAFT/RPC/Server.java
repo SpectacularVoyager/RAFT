@@ -1,6 +1,6 @@
 package RAFT.RPC;
 
-import RAFT.RAFT.ID;
+import RAFT.RPC.Type.ID;
 import RAFT.RPC.Type.HeartBeatRequest;
 import RAFT.RPC.Type.HeartBeatResponse;
 import RAFT.RPC.Type.RequestVoteRequest;
