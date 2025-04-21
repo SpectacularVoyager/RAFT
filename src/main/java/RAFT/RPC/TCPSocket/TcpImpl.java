@@ -33,7 +33,7 @@ public class TcpImpl {
             res.get(socketChannel);
         } catch (Exception e) {
             System.out.println(e);
-            throw new RuntimeException(e);
+//            throw new RuntimeException(e);
         }
         return true;
     }

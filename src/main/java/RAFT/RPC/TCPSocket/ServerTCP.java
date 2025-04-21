@@ -30,4 +30,9 @@ public class ServerTCP implements Server {
         TcpImpl.RPC(RPC.REQUEST_VOTE,id, req, res);
         return res;
     }
+
+    @Override
+    public String toString() {
+        return id.toString();
+    }
 }

@@ -33,6 +33,7 @@ public class Raft implements Server {
     RPCManagerTCP manager;
 
     private volatile ScheduledFuture<?> timer = null;
+    private volatile ScheduledFuture<?> electionBid = null;
 
 
     public synchronized boolean isMajority() {
@@ -52,6 +53,7 @@ public class Raft implements Server {
 
             synchronized (lock) {
                 if (reply.term > this.term) {
+                    System.out.println(term + "\t" + reply.term);
                     changeState(RaftState.FOLLOWER);
                 }
             }
@@ -62,13 +64,16 @@ public class Raft implements Server {
     @Override
     public @NonNull HeartBeatResponse sendHeartBeat(HeartBeatRequest req) {
         synchronized (lock) {
-//            logger.log("RECIEVED HEARTBEAT");
+//            logger.log("RECIEVED HEARTBEAT FROM:"+req.getLeaderID());
 //            logger.log(req.toString());
 
             if (term <= req.getLeaderTerm()) {
                 voteFor(null);
                 if (state != RaftState.FOLLOWER) {
                     changeState(RaftState.FOLLOWER);
+                }
+                if(term!=req.getLeaderTerm()){
+                    logger.logf("UPDATED TERM TO [%d] <- [%d]\n",req.getLeaderTerm(),term);
                 }
                 term = req.getLeaderTerm();
             }
@@ -78,12 +83,17 @@ public class Raft implements Server {
             //ACCEPT LOGS
 
             //RESET TIMER
-            if (timer != null) {
-                timer.cancel(false);
-            }
-            timer = executor.schedule(this::mainLoop, getDelay(), TimeUnit.MILLISECONDS);
+            resetTimers();
             return new HeartBeatResponse(this.term, true);
         }
+    }
+    synchronized void resetTimers(){
+        //RESET TIMER
+        if (timer != null) {
+            timer.cancel(true);
+        }
+        timer = executor.schedule(this::mainLoop, getDelay(), TimeUnit.MILLISECONDS);
+
     }
 
     public void startElection() {
@@ -106,10 +116,10 @@ public class Raft implements Server {
             if (isMajority()) {
                 //CHANGE STATE TO LEADER
                 changeState(RaftState.LEADER);
-                logger.logf("WON ELECTION WITH (%d/%d) VOTES\n", votesRecieved, servers.size() + 1);
+                logger.logf("WON ELECTION[%d] WITH (%d/%d) VOTES\n", term, votesRecieved, servers.size() + 1);
+                executor.execute(this::sendHeartBeats);
             } else {
-                logger.logf("LOST ELECTION WITH (%d/%d) VOTES\n", votesRecieved, servers.size() + 1);
-
+                logger.logf("LOST ELECTION[%d] WITH (%d/%d) VOTES\n", term, votesRecieved, servers.size() + 1);
             }
         }
     }
@@ -125,6 +135,7 @@ public class Raft implements Server {
             }
             if (term < req.getTerm()) {
                 if (state != RaftState.FOLLOWER) {
+                    System.out.println(term+"\t"+req.getTerm());
                     changeState(RaftState.FOLLOWER);
                     voteFor(req.getId());
                 }
@@ -135,18 +146,18 @@ public class Raft implements Server {
                     return rejectVote(req, "SAME TERM");
                 }
             }
-            if (votedFor != null && votedFor != req.getId()) {
-                return rejectVote(req, "ALREADY VOTING FOR:" + req.getId());
+            if (votedFor != null && !votedFor.equals(req.getId())) {
+                return rejectVote(req, "ALREADY VOTING FOR:" + votedFor);
             }
             voteFor(req.getId());
-            logger.log("VOTED FOR:" + req.getId());
+            logger.logf("VOTED FOR[%d]: %s\n", req.getTerm(), req.getId());
             return new RequestVoteResponse(this.term, true);
         }
     }
 
     public RequestVoteResponse rejectVote(RequestVoteRequest x, String s) {
-        logger.logf("%s\tREJECTED VOTE [%d] FOR [%s]:\t%s\n", id.toString(), term, x.getId().toString(), s);
-        return new RequestVoteResponse(this.term, false);
+        logger.logf("REJECTED VOTE [%d] FOR [%s]:\t%s\n", term, x.getId().toString(), s);
+        return new RequestVoteResponse(x.getTerm(), false);
     }
 
 
@@ -161,7 +172,8 @@ public class Raft implements Server {
                     voteFor(this.id);
                     this.votesRecieved = 1;
                 }
-                startElection();
+                executor.execute(this::startElection);
+
             }
             case FOLLOWER -> {
                 synchronized (lock) {
@@ -170,12 +182,10 @@ public class Raft implements Server {
                     this.votesRecieved = 1;
                     changeState(RaftState.CANDIDATE);
                 }
-                startElection();
+                executor.execute(this::startElection);
             }
         }
-        synchronized (lock) {
-            timer = executor.schedule(this::mainLoop, getDelay(), TimeUnit.MILLISECONDS);
-        }
+        resetTimers();
 
     }
 
@@ -183,7 +193,6 @@ public class Raft implements Server {
         this.id = config.id;
         this.config = config;
         this.servers = this.config.servers;
-        changeState(RaftState.FOLLOWER);
         manager = new RPCManagerTCP(this);
         logger.log("STARTING RAFT");
         try {
@@ -192,14 +201,17 @@ public class Raft implements Server {
             //LOG FATAL N CANNOT BE LESSER THAN 0
             throw new RuntimeException("THREAD SIZE < 0");
         }
-        executor.schedule(this::mainLoop, 150, TimeUnit.MILLISECONDS);
+        changeState(RaftState.FOLLOWER);
+        executor.execute(this::mainLoop);
+
+//        executor.schedule(this::mainLoop, 150, TimeUnit.MILLISECONDS);
         executor.execute(manager);
     }
 
     public synchronized long getDelay() {
         switch (state) {
             case CANDIDATE, RaftState.FOLLOWER -> {
-                return 150 + (int) (Math.random() * 150);
+                return 450 + (int) (Math.random() * 150);
             }
             case LEADER -> {
                 return 100;
@@ -215,20 +227,28 @@ public class Raft implements Server {
     }
 
     public synchronized void changeState(RaftState state) {
-        int b=0,h=0;
+        if (state == RaftState.FOLLOWER) {
+            synchronized (lock) {
+                if (electionBid != null) {
+                    electionBid.cancel(true);
+                }
+            }
+        }
+        int b = 0, h = 0;
         switch (state) {
             case FOLLOWER -> {
                 logger.setFormat(AnsiColor.WHITE, b, h);
             }
             case CANDIDATE -> {
-                logger.setFormat(AnsiColor.GREEN, b,h);
+                logger.setFormat(AnsiColor.GREEN, b, h);
             }
             case LEADER -> {
-                logger.setFormat(AnsiColor.BLUE, b,h);
+                logger.setFormat(AnsiColor.BLUE, b, h);
             }
         }
-        logger.log(id + "\tCHANGED STATE TO:" + state);
+        logger.log("CHANGED STATE TO:" + state);
         this.state = state;
+        resetTimers();
     }
 
 }

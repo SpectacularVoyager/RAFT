@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
 import java.nio.channels.ServerSocketChannel;
@@ -31,17 +32,18 @@ public class RPCManagerTCP implements Runnable {
             serverSocketChannel.socket().bind(new InetSocketAddress(r.getConfig().getId().getPort()));
             while (true) {
                 socketChannel = serverSocketChannel.accept();
-                ByteBuffer buffer= ByteBuffer.allocate(4);
+                ByteBuffer buffer = ByteBuffer.allocate(4);
                 buffer.clear();
                 socketChannel.read(buffer);
                 buffer.flip();
-                int function=buffer.getInt();
+                int function = buffer.getInt();
                 handleRPC(function, socketChannel);
                 socketChannel.close();
             }
+        } catch (SocketException e) {
+            System.out.println(e);
         } catch (IOException e) {
             System.out.println(e);
-            throw new RuntimeException(e);
         }
     }
 
