@@ -7,8 +7,8 @@ import lombok.Getter;
 @AllArgsConstructor
 public class ID {
     private long id;
-    private String address;
-
+    private String host;
+    private int port;
 
     @Override
     public boolean equals(Object obj) {
