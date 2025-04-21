@@ -64,7 +64,7 @@ public class BinaryBuilder {
             }
             sb.append(String.format("\t%s %s;\n", x.type, x.name));
         }
-        sb.append(String.format("\t%s(ByteChannel channel){\n", className));
+        sb.append(String.format("\t%s(ByteChannel channel) throws IOException {\n", className));
         sb.append("\t\tget(channel);\n");
         sb.append("\t}\n");
         List<String> put = new ArrayList<>();
@@ -90,7 +90,7 @@ public class BinaryBuilder {
             }
         }
         if (sum != 0) {
-            put.add(String.format("ByteBuffer buffer=new ByteBuffer(%d);",sum));
+            put.add(String.format("ByteBuffer buffer=ByteBuffer.allocate(%d);",sum));
             put.add("buffer.clear();");
             put.addAll(temp.stream().map(x -> fromPair(x, "put")).toList());
             put.add("buffer.flip();");
@@ -106,7 +106,7 @@ public class BinaryBuilder {
             Pair pair = pairs.get(i);
             if (!isPrimitive(pair.type)) {
                 if (sum != 0) {
-                    put.add(String.format("ByteBuffer buffer=new ByteBuffer(%d);",sum));
+                    put.add(String.format("ByteBuffer buffer=ByteBuffer.allocate(%d);",sum));
                     put.add("buffer.clear();");
                     put.add("channel.read(buffer);\n");
                     put.add("buffer.flip();");
@@ -122,7 +122,7 @@ public class BinaryBuilder {
             }
         }
         if (sum != 0) {
-            put.add(String.format("ByteBuffer buffer=new ByteBuffer(%d);",sum));
+            put.add(String.format("ByteBuffer buffer=ByteBuffer.allocate(%d);",sum));
             put.add("buffer.clear();");
             put.addAll(temp.stream().map(x -> fromPair(x, "get")).toList());
             put.add("buffer.flip();");
@@ -186,6 +186,6 @@ public class BinaryBuilder {
     }
 
     String addFunction(String name, List<String> body) {
-        return String.format("\t@Override\n\tpublic void %s(ByteChannel channel){\n%s\n\t}\n", name, body.stream().map(x -> "\t\t" + x + "\n").reduce("", String::concat));
+        return String.format("\t@Override\n\tpublic void %s(ByteChannel channel) throws IOException {\n%s\n\t}\n", name, body.stream().map(x -> "\t\t" + x + "\n").reduce("", String::concat));
     }
 }

@@ -2,6 +2,7 @@ package RAFT.RAFT;
 
 import Logging.AnsiColor;
 import Logging.RaftLogger;
+import RAFT.RAFT.Logs.Log;
 import RAFT.RPC.*;
 import RAFT.RPC.TCPSocket.RPCManagerTCP;
 import RAFT.RPC.Type.*;
@@ -9,6 +10,7 @@ import lombok.Getter;
 import lombok.NonNull;
 
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -27,16 +29,18 @@ public class Raft implements Server {
     private volatile ID votedFor = null;
     private volatile long commitIndex = 0;
 
-    private volatile long votesRecieved = 0;
+    private volatile long votesReceived = 0;
     ScheduledThreadPoolExecutor executor;
     List<Server> servers;
     RPCManagerTCP manager;
 
+    List<Log> logs;
+    private ID leaderID;
+
     private volatile ScheduledFuture<?> timer = null;
-    private volatile ScheduledFuture<?> electionBid = null;
 
     public synchronized boolean isMajority() {
-        return (2 * votesRecieved > (this.servers.size() + 1));
+        return (2 * votesReceived > (this.servers.size() + 1));
     }
 
     public void sendHeartBeats() {
@@ -48,6 +52,7 @@ public class Raft implements Server {
             request.setLeaderTerm(term);
             request.setPrevLogIndex(0);
             request.setPrevLogTerm(0);
+            request.setLogs(List.of());
             var reply = x.sendHeartBeat(request);
 
             synchronized (lock) {
@@ -58,15 +63,44 @@ public class Raft implements Server {
         }
     }
 
+    private void commit(Log log) {
+        System.out.println(log);
+    }
+
+    private void commit(long index) {
+        while (!logs.isEmpty()) {
+            if (logs.getFirst().getIndex() <= index) {
+                //COMMIT LOG
+                commit(logs.getFirst());
+                logs.removeFirst();
+                break;
+            }
+        }
+    }
+
+    public synchronized List<Log> getLogsAfter() {
+        return logs.stream().skip(commitIndex).toList();
+    }
+
+    @Override
+    public long getLogIndex() {
+        return commitIndex;
+    }
+
+    @Override
+    public void setLogIndex(long c) {
+        this.commitIndex = c;
+    }
 
     @Override
     public @NonNull HeartBeatResponse sendHeartBeat(HeartBeatRequest req) {
         synchronized (lock) {
 //            logger.log("RECIEVED HEARTBEAT FROM:"+req.getLeaderID());
 //            logger.log(req.toString());
-
+            if (!req.getLogs().isEmpty()) {
+                logger.log(req.getLogs().toString());
+            }
             if (term <= req.getLeaderTerm()) {
-
                 if (state != RaftState.FOLLOWER) {
                     changeState(RaftState.FOLLOWER);
                 }
@@ -78,6 +112,7 @@ public class Raft implements Server {
             if (term > req.getLeaderTerm()) {
                 return new HeartBeatResponse(this.term, false);
             }
+            leaderID = req.getLeaderID();
             //ACCEPT LOGS
 
             //RESET TIMER
@@ -111,7 +146,7 @@ public class Raft implements Server {
                     return;
                 }
                 if (reply.isVoteGranted()) {
-                    this.votesRecieved++;
+                    this.votesReceived++;
                 }
             }
 
@@ -120,10 +155,10 @@ public class Raft implements Server {
             if (isMajority()) {
                 //CHANGE STATE TO LEADER
                 changeState(RaftState.LEADER);
-                logger.logf("WON ELECTION[%d] WITH (%d/%d) VOTES\n", term, votesRecieved, servers.size() + 1);
+                logger.logf("WON ELECTION[%d] WITH (%d/%d) VOTES\n", term, votesReceived, servers.size() + 1);
                 executor.execute(this::sendHeartBeats);
             } else {
-                logger.logf("LOST ELECTION[%d] WITH (%d/%d) VOTES\n", term, votesRecieved, servers.size() + 1);
+                logger.logf("LOST ELECTION[%d] WITH (%d/%d) VOTES\n", term, votesReceived, servers.size() + 1);
             }
         }
     }
@@ -158,6 +193,18 @@ public class Raft implements Server {
         }
     }
 
+    @Override
+    public UpdateResponse update(RPCString string) {
+        System.out.println(string);
+        synchronized (lock) {
+            if (state != RaftState.LEADER)
+                return new UpdateResponse(leaderID);
+            Log l = new Log(logs.size(), term, string);
+            logs.add(l);
+            return new UpdateResponse(l);
+        }
+    }
+
     public RequestVoteResponse rejectVote(RequestVoteRequest x, String s) {
         logger.logf("REJECTED VOTE [%d] FOR [%s]:\t%s\n", term, x.getId().toString(), s);
         return new RequestVoteResponse(x.getTerm(), false);
@@ -173,7 +220,7 @@ public class Raft implements Server {
                 synchronized (lock) {
                     term++;
                     voteFor(this.id);
-                    this.votesRecieved = 1;
+                    this.votesReceived = 1;
                 }
                 executor.execute(this::startElection);
 
@@ -182,7 +229,7 @@ public class Raft implements Server {
                 synchronized (lock) {
                     term++;
                     voteFor(this.id);
-                    this.votesRecieved = 1;
+                    this.votesReceived = 1;
                     changeState(RaftState.CANDIDATE);
                 }
                 executor.execute(this::startElection);
@@ -204,6 +251,8 @@ public class Raft implements Server {
             //LOG FATAL N CANNOT BE LESSER THAN 0
             throw new RuntimeException("THREAD SIZE < 0");
         }
+        logs = new LinkedList<>();
+        setLogIndex(logs.size());
         changeState(RaftState.FOLLOWER);
         executor.execute(this::mainLoop);
 
@@ -236,13 +285,6 @@ public class Raft implements Server {
     }
 
     public synchronized void changeState(RaftState state) {
-        if (state == RaftState.FOLLOWER) {
-            synchronized (lock) {
-                if (electionBid != null) {
-                    electionBid.cancel(true);
-                }
-            }
-        }
         int b = 0, h = 0;
         switch (state) {
             case FOLLOWER -> {
@@ -257,6 +299,11 @@ public class Raft implements Server {
         }
         logger.log("CHANGED STATE TO:" + state);
         this.state = state;
+        if (state == RaftState.LEADER) {
+            for (Server x : servers) {
+                x.setLogIndex(this.getLogIndex());
+            }
+        }
         resetTimers();
     }
 

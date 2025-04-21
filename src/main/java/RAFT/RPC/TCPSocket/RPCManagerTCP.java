@@ -60,6 +60,11 @@ public class RPCManagerTCP implements Runnable {
                 RequestVoteResponse resp = r.requestVote(req);
                 resp.put(chan);
             }
+            case RPC.UPDATE -> {
+                RPCString req = new RPCString(chan);
+                UpdateResponse resp = r.update(req);
+                resp.put(chan);
+            }
             default -> {
                 r.getLogger().logf("INVALID RPC FUNCTION[%d]\n", type);
 

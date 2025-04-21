@@ -3,11 +3,12 @@ package RAFT.RAFT.Logs;
 import RAFT.RPC.Type.ID;
 import RAFT.RPC.Type.RPCMessage;
 import RAFT.RPC.Type.RPCString;
+import lombok.*;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
-
+@Getter@Setter@ToString@AllArgsConstructor@NoArgsConstructor
 public class Log implements RPCMessage {
     long index;
     long term;
