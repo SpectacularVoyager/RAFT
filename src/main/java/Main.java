@@ -14,9 +14,12 @@ public class Main {
 //        Logger logger = LoggerFactory.getLogger(Main.class);
 //        logger.info("Example log from {}", Main.class.getSimpleName());//
 
-        List<ID> l = List.of(new ID(123, 8001, "localhost"));
-        Raft r1 = new Raft(new Config(new ID(1000,8000,"localhost"), List.of()));
-        Raft r2 = new Raft(new Config(new ID(1000,8001,"localhost"), l.stream().map(ServerTCP::new).map(x->(Server)x).toList()));
+        List<ID> l1 = List.of(new ID(123, 8001, "localhost"),new ID(123, 8002, "localhost"));
+        List<ID> l2 = List.of(new ID(123, 8000, "localhost"),new ID(123, 8002, "localhost"));
+        List<ID> l3 = List.of(new ID(123, 8000, "localhost"),new ID(123, 8001, "localhost"));
+        Raft r1 = new Raft(new Config(new ID(1000,8000,"localhost"), l1.stream().map(ServerTCP::new).map(x->(Server)x).toList()));
+        Raft r2 = new Raft(new Config(new ID(1001,8001,"localhost"), l2.stream().map(ServerTCP::new).map(x->(Server)x).toList()));
+        Raft r3 = new Raft(new Config(new ID(1002,8002,"localhost"), l3.stream().map(ServerTCP::new).map(x->(Server)x).toList()));
         System.out.println("EY");
     }
 }

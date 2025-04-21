@@ -62,6 +62,6 @@ public class ID implements RPCMessage {
 
     @Override
     public String toString() {
-        return String.format("%d  ->  %s:%d",id,host,port);
+        return String.format("[%d  ->  %s:%d]",id,host,port);
     }
 }

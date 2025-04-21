@@ -31,13 +31,12 @@ public class RPCManagerTCP implements Runnable {
             serverSocketChannel.socket().bind(new InetSocketAddress(r.getConfig().getId().getPort()));
             while (true) {
                 socketChannel = serverSocketChannel.accept();
-                System.out.println("RECIEVED RPC");
                 ByteBuffer buffer= ByteBuffer.allocate(4);
                 buffer.clear();
                 socketChannel.read(buffer);
                 buffer.flip();
-
-                handleRPC(buffer.getInt(), socketChannel);
+                int function=buffer.getInt();
+                handleRPC(function, socketChannel);
                 socketChannel.close();
             }
         } catch (IOException e) {
