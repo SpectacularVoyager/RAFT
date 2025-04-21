@@ -5,6 +5,7 @@ import RAFT.RPC.Type.RPCMessage;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
@@ -31,9 +32,10 @@ public class TcpImpl {
         try {
             req.put(socketChannel);
             res.get(socketChannel);
-        } catch (Exception e) {
-            System.out.println(e);
+        } catch (SocketException e) {
 //            throw new RuntimeException(e);
+        } catch (IOException e) {
+            System.out.println(e);
         }
         return true;
     }

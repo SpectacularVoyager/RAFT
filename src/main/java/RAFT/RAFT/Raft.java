@@ -35,7 +35,6 @@ public class Raft implements Server {
     private volatile ScheduledFuture<?> timer = null;
     private volatile ScheduledFuture<?> electionBid = null;
 
-
     public synchronized boolean isMajority() {
         return (2 * votesRecieved > (this.servers.size() + 1));
     }
@@ -53,7 +52,6 @@ public class Raft implements Server {
 
             synchronized (lock) {
                 if (reply.term > this.term) {
-                    System.out.println(term + "\t" + reply.term);
                     changeState(RaftState.FOLLOWER);
                 }
             }
@@ -68,12 +66,12 @@ public class Raft implements Server {
 //            logger.log(req.toString());
 
             if (term <= req.getLeaderTerm()) {
-                voteFor(null);
+
                 if (state != RaftState.FOLLOWER) {
                     changeState(RaftState.FOLLOWER);
                 }
-                if(term!=req.getLeaderTerm()){
-                    logger.logf("UPDATED TERM TO [%d] <- [%d]\n",req.getLeaderTerm(),term);
+                if (term != req.getLeaderTerm()) {
+                    logger.logf("UPDATED TERM TO [%d] <- [%d]\n", req.getLeaderTerm(), term);
                 }
                 term = req.getLeaderTerm();
             }
@@ -84,10 +82,12 @@ public class Raft implements Server {
 
             //RESET TIMER
             resetTimers();
+            voteFor(null);
             return new HeartBeatResponse(this.term, true);
         }
     }
-    synchronized void resetTimers(){
+
+    synchronized void resetTimers() {
         //RESET TIMER
         if (timer != null) {
             timer.cancel(true);
@@ -106,6 +106,10 @@ public class Raft implements Server {
             request.setLastLogTerm(0);
             var reply = x.requestVote(request);
             synchronized (lock) {
+                if (reply.getTerm() > term) {
+                    changeState(RaftState.FOLLOWER);
+                    return;
+                }
                 if (reply.isVoteGranted()) {
                     this.votesRecieved++;
                 }
@@ -135,7 +139,6 @@ public class Raft implements Server {
             }
             if (term < req.getTerm()) {
                 if (state != RaftState.FOLLOWER) {
-                    System.out.println(term+"\t"+req.getTerm());
                     changeState(RaftState.FOLLOWER);
                     voteFor(req.getId());
                 }
@@ -211,7 +214,7 @@ public class Raft implements Server {
     public synchronized long getDelay() {
         switch (state) {
             case CANDIDATE, RaftState.FOLLOWER -> {
-                return 450 + (int) (Math.random() * 150);
+                return 150 + (int) (Math.random() * 150);
             }
             case LEADER -> {
                 return 100;
@@ -223,6 +226,12 @@ public class Raft implements Server {
     }
 
     public synchronized void voteFor(ID id) {
+        if (id == null) {
+        } else if (id == this.id) {
+            System.out.println("VOTING FOR MYSELF");
+        } else {
+            System.out.println("VOTING FOR:" + id);
+        }
         this.votedFor = id;
     }
 

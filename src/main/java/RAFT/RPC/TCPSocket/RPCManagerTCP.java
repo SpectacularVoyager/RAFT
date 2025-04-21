@@ -41,7 +41,7 @@ public class RPCManagerTCP implements Runnable {
                 socketChannel.close();
             }
         } catch (SocketException e) {
-            System.out.println(e);
+//            System.out.println(e);
         } catch (IOException e) {
             System.out.println(e);
         }
