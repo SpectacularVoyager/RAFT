@@ -7,9 +7,11 @@ import lombok.NonNull;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.ExecutorService;
 
 
 public class RPCManagerTCP implements Runnable {
@@ -17,9 +19,11 @@ public class RPCManagerTCP implements Runnable {
     Raft r;
     ServerSocketChannel serverSocketChannel;
     SocketChannel socketChannel;
+    ExecutorService executor;
 
-    public RPCManagerTCP(Raft r) throws IOException {
+    public RPCManagerTCP(Raft r, ExecutorService service) throws IOException {
         this.r = r;
+        this.executor = service;
 
     }
 
@@ -35,37 +39,49 @@ public class RPCManagerTCP implements Runnable {
                 socketChannel.read(buffer);
                 buffer.flip();
                 int function = buffer.getInt();
+//                executor.execute();
                 handleRPC(function, socketChannel);
                 socketChannel.close();
             }
         } catch (SocketException e) {
 //            System.out.println(e);
         } catch (IOException e) {
-            System.out.println(e);
+//            System.out.println(e);
         }
     }
 
-    void handleRPC(@NonNull int type, SocketChannel chan) throws IOException {
+    void handleRPC(@NonNull int type, SocketChannel chan) {
+        try {
+            switch (type) {
+                case RPC.HEARTBEAT -> {
+                    HeartBeatRequest req = new HeartBeatRequest(chan);
+                    HeartBeatResponse resp = r.recieveHeartBeat(req);
+                    resp.put(chan);
+                }
+                case RPC.REQUEST_VOTE -> {
+                    RequestVoteRequest req = new RequestVoteRequest(chan);
+                    RequestVoteResponse resp = r.recieveRequestVote(req);
+                    resp.put(chan);
+                }
+                case RPC.UPDATE -> {
+                    RPCString req = new RPCString(chan);
+                    UpdateResponse resp = r.update(req);
+                    resp.put(chan);
+                }
+                default -> {
+                    r.getLogger().logf("INVALID RPC FUNCTION[%d]\n", type);
 
-        switch (type) {
-            case RPC.HEARTBEAT -> {
-                HeartBeatRequest req = new HeartBeatRequest(chan);
-                HeartBeatResponse resp = r.recieveHeartBeat(req);
-                resp.put(chan);
+                }
             }
-            case RPC.REQUEST_VOTE -> {
-                RequestVoteRequest req = new RequestVoteRequest(chan);
-                RequestVoteResponse resp = r.recieveRequestVote(req);
-                resp.put(chan);
-            }
-            case RPC.UPDATE -> {
-                RPCString req = new RPCString(chan);
-                UpdateResponse resp = r.update(req);
-                resp.put(chan);
-            }
-            default -> {
-                r.getLogger().logf("INVALID RPC FUNCTION[%d]\n", type);
+        } catch (BufferUnderflowException e) {
 
+            System.out.println(e);
+        } catch (Exception e) {
+        } finally {
+            try {
+                chan.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
         }
     }

@@ -10,11 +10,10 @@ import lombok.Getter;
 import lombok.NonNull;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 public class Raft implements Server {
     @Getter
@@ -39,9 +38,6 @@ public class Raft implements Server {
 
     private volatile ScheduledFuture<?> timer = null;
 
-    public synchronized boolean isMajority() {
-        return (2 * votesReceived > (this.servers.size() + 1));
-    }
 
     public void sendHeartBeats() {
         for (var x : servers) {
@@ -53,46 +49,21 @@ public class Raft implements Server {
             request.setPrevLogIndex(0);
             request.setPrevLogTerm(0);
             request.setLogs(List.of());
-            var r = x.sendHeartBeat(request);
-            if(r.isEmpty())continue;
-            var reply=r.get();
+            executor.submit(() -> {
+                var r = x.sendHeartBeat(request);
+                if (r.isEmpty()) return;
+                var reply = r.get();
 
 
-            synchronized (lock) {
-                if (reply.term > this.term) {
-                    changeState(RaftState.FOLLOWER);
+                synchronized (lock) {
+                    if (reply.term > this.term) {
+                        changeState(RaftState.FOLLOWER);
+                    }
                 }
-            }
+
+            });
+
         }
-    }
-
-    private void commit(Log log) {
-        System.out.println(log);
-    }
-
-    private void commit(long index) {
-        while (!logs.isEmpty()) {
-            if (logs.getFirst().getIndex() <= index) {
-                //COMMIT LOG
-                commit(logs.getFirst());
-                logs.removeFirst();
-                break;
-            }
-        }
-    }
-
-    public synchronized List<Log> getLogsAfter() {
-        return logs.stream().skip(commitIndex).toList();
-    }
-
-    @Override
-    public long getLogIndex() {
-        return commitIndex;
-    }
-
-    @Override
-    public void setLogIndex(long c) {
-        this.commitIndex = c;
     }
 
     @Override
@@ -125,16 +96,10 @@ public class Raft implements Server {
         }
     }
 
-    synchronized void resetTimers() {
-        //RESET TIMER
-        if (timer != null) {
-            timer.cancel(true);
-        }
-        timer = executor.schedule(this::mainLoop, getDelay(), TimeUnit.MILLISECONDS);
-
-    }
-
     public void startElection() {
+        long electionStartTerm = this.term;
+        List<Future<?>> futures = new ArrayList<>();
+        Phaser phaser = new Phaser(1);
         for (var x : servers) {
             //SEND REQUEST VOTE
             RequestVoteRequest request = new RequestVoteRequest();
@@ -142,31 +107,45 @@ public class Raft implements Server {
             request.setTerm(term);
             request.setLastLogIndex(0);
             request.setLastLogTerm(0);
-            var r = x.requestVote(request);
-            if(r.isEmpty())continue;
 
-            var reply=r.get();
-            synchronized (lock) {
-                if (reply.getTerm() > term) {
-                    changeState(RaftState.FOLLOWER);
-                    return;
-                }
-                if (reply.isVoteGranted()) {
-                    this.votesReceived++;
-                }
-            }
+            var f = executor.submit(() -> {
+                var r = x.requestVote(request);
+                phaser.arrive();
+                if (r.isEmpty()) return;
 
+                var reply = r.get();
+                synchronized (lock) {
+                    if (reply.getTerm() > term) {
+                        changeState(RaftState.FOLLOWER);
+                        futures.forEach(future -> future.cancel(false));
+                        phaser.forceTermination();
+                    }
+                    if (reply.isVoteGranted()) {
+                        this.votesReceived++;
+                    }
+                    if (isMajority()) {
+                        changeState(RaftState.LEADER);
+                        futures.forEach(future -> future.cancel(false));
+                        phaser.forceTermination();
+                    }
+
+                }
+            });
+            futures.add(f);
+            phaser.register();
         }
+        phaser.arriveAndAwaitAdvance();
         synchronized (lock) {
-            if (isMajority()) {
-                //CHANGE STATE TO LEADER
-                changeState(RaftState.LEADER);
-                logger.logf("WON ELECTION[%d] WITH (%d/%d) VOTES\n", term, votesReceived, servers.size() + 1);
+            if (state == RaftState.LEADER) {
+                logger.logf("WON ELECTION[%d] WITH (%d/%d) VOTES\n", electionStartTerm, votesReceived, servers.size() + 1);
                 executor.execute(this::sendHeartBeats);
+
             } else {
-                logger.logf("LOST ELECTION[%d] WITH (%d/%d) VOTES\n", term, votesReceived, servers.size() + 1);
+                logger.logf("LOST ELECTION[%d] WITH (%d/%d) VOTES\n", electionStartTerm, votesReceived, servers.size() + 1);
+
             }
         }
+
     }
 
     @Override
@@ -211,11 +190,6 @@ public class Raft implements Server {
         }
     }
 
-    public RequestVoteResponse rejectVote(RequestVoteRequest x, String s) {
-        logger.logf("REJECTED VOTE [%d] FOR [%s]:\t%s\n", term, x.getId().toString(), s);
-        return new RequestVoteResponse(x.getTerm(), false);
-    }
-
 
     private void mainLoop() {
         switch (state) {
@@ -249,7 +223,7 @@ public class Raft implements Server {
         this.id = config.id;
         this.config = config;
         this.servers = this.config.servers;
-        manager = new RPCManagerTCP(this);
+        manager = new RPCManagerTCP(this, executor);
         logger.log("STARTING RAFT");
         try {
             executor = new ScheduledThreadPoolExecutor(5);
@@ -312,5 +286,53 @@ public class Raft implements Server {
         }
         resetTimers();
     }
+
+    private void commit(Log log) {
+        System.out.println(log);
+    }
+
+    private void commit(long index) {
+        while (!logs.isEmpty()) {
+            if (logs.getFirst().getIndex() <= index) {
+                //COMMIT LOG
+                commit(logs.getFirst());
+                logs.removeFirst();
+                break;
+            }
+        }
+    }
+
+    public synchronized List<Log> getLogsAfter() {
+        return logs.stream().skip(commitIndex).toList();
+    }
+
+    @Override
+    public long getLogIndex() {
+        return commitIndex;
+    }
+
+    @Override
+    public void setLogIndex(long c) {
+        this.commitIndex = c;
+    }
+
+    public synchronized boolean isMajority() {
+        return (2 * votesReceived > (this.servers.size() + 1));
+    }
+
+    synchronized void resetTimers() {
+        //RESET TIMER
+        if (timer != null) {
+            timer.cancel(true);
+        }
+        timer = executor.schedule(this::mainLoop, getDelay(), TimeUnit.MILLISECONDS);
+
+    }
+
+    public RequestVoteResponse rejectVote(RequestVoteRequest x, String s) {
+        logger.logf("REJECTED VOTE [%d] FOR [%s]:\t%s\n", term, x.getId().toString(), s);
+        return new RequestVoteResponse(x.getTerm(), false);
+    }
+
 
 }
