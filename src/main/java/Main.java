@@ -23,12 +23,13 @@ public class Main {
 
             data = """
                     {
-                      "servers": [
-                        {"address": "tcp/localhost:8000","id":1},
-                        {"address": "tcp/localhost:8001","id":2},
-                        {"address": "tcp/localhost:8002","id":3}
-                      ]
-                    }
+                       "logfile": "log",
+                       "servers": [
+                         {"address": "tcp/localhost:8000","id":1},
+                         {"address": "tcp/localhost:8001","id":2},
+                         {"address": "tcp/localhost:8002","id":3}
+                       ]
+                     }
                     """;
             id = 1;
 

@@ -8,11 +8,22 @@ import lombok.*;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
-@Getter@Setter@ToString@AllArgsConstructor@NoArgsConstructor
+
+@Getter
+@Setter
+@ToString
+@AllArgsConstructor
+@NoArgsConstructor
 public class Log implements RPCMessage {
     long index;
     long term;
     RPCMessage message;
+
+    public Log(long index, long term, String message) {
+        this.index = index;
+        this.term = term;
+        this.message = new RPCString(message);
+    }
 
     @Override
     public void put(ByteChannel channel) throws IOException {
@@ -38,7 +49,7 @@ public class Log implements RPCMessage {
         index = in.getLong();
         term = in.getLong();
 
-        message=new RPCString(channel);
+        message = new RPCString(channel);
         //ENTRIES
     }
 

@@ -13,6 +13,8 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,17 +23,15 @@ import java.util.List;
 @AllArgsConstructor
 public class Config {
     ID id;
+    Path logfile;
     List<RPCServer> servers = new ArrayList<>();
     JSONParser parser = new JSONParser();
 
     public void addServer(JSONObject s) throws ParseException {
-
         servers.add(ServerFactory.getServer((String) s.get("address"), (Long) s.get("id")));
     }
 
     public Config(String s, long _id) throws ParseException {
-
-
         JSONObject c = (JSONObject) parser.parse(s);
         for (Object x : (JSONArray) c.get("servers")) {
             addServer((JSONObject) x);
@@ -43,6 +43,11 @@ public class Config {
             throw new RuntimeException("INVALID ID:" + _id);
         }
         id = t.get().getId();
+        String fp = (String) c.get("logfile");
+        if (fp == null) {
+            throw new RuntimeException("PLEASE PROVIDE FILEPATH AS logfile");
+        }
+        logfile = Paths.get((String) fp, String.valueOf(id.getId()));
     }
 
     @Override

@@ -1,6 +1,7 @@
 package RAFT.RAFT;
 
 import Logging.AnsiColor;
+import Logging.AppendOnlyLog;
 import Logging.RaftLogger;
 import RAFT.RAFT.Logs.Log;
 import RAFT.RPC.*;
@@ -9,11 +10,19 @@ import RAFT.RPC.Type.*;
 import lombok.Getter;
 import lombok.NonNull;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class Raft implements Server {
     @Getter
@@ -26,7 +35,6 @@ public class Raft implements Server {
     private volatile RaftState state = RaftState.FOLLOWER;
     private volatile long term = 0;
     private volatile ID votedFor = null;
-    private volatile long commitIndex = 0;
 
     private volatile long votesReceived = 0;
     ScheduledThreadPoolExecutor executor;
@@ -35,45 +43,79 @@ public class Raft implements Server {
 
     List<Log> logs;
     private ID leaderID;
+    long commitIndex = -1;
+    AppendOnlyLog aol;
 
     private volatile ScheduledFuture<?> timer = null;
 
 
     public void sendHeartBeats() {
+
+        List<Future<Long>> futures = new ArrayList<>();
         for (var x : servers) {
             //SEND HEARTBEAT
             HeartBeatRequest request = new HeartBeatRequest();
             request.setLeaderCommit(commitIndex);
             request.setLeaderID(id);
             request.setLeaderTerm(term);
-            request.setPrevLogIndex(0);
+            request.setPrevLogIndex(x.getLogIndex());
             request.setPrevLogTerm(0);
-            request.setLogs(List.of());
-            executor.submit(() -> {
-                var r = x.sendHeartBeat(request);
-                if (r.isEmpty()) return;
-                var reply = r.get();
+            request.setLogs(logs.subList((int) Math.max(x.getLogIndex(), 0), logs.size()));
+            var f = executor.submit(new Callable<Long>() {
+                @Override
+                public Long call() throws Exception {
+                    var r = x.sendHeartBeat(request);
+                    if (r.isEmpty()) return Long.MAX_VALUE;
+                    ;
+                    var reply = r.get();
+                    synchronized (lock) {
+                        if (reply.term > term) {
+                            changeState(RaftState.FOLLOWER);
+                            futures.forEach(future -> future.cancel(false));
+                            return Long.MAX_VALUE;
+                        }
+                        if (!reply.success) {
+                            x.setLogIndex(Math.max(x.getLogIndex() - 1, -1));
+//                        logger.log("CANNOT APPEND TO:" + x.getId() + "\tTRYING WITH INDEX:" + x.getLogIndex());
 
-
-                synchronized (lock) {
-                    if (reply.term > this.term) {
-                        changeState(RaftState.FOLLOWER);
+                        } else {
+                            x.setLogIndex(logs.size());
+                            return x.getLogIndex();
+                        }
                     }
+                    return Long.MAX_VALUE;
+                }
+            });
+            futures.add(f);
+
+        }
+
+        var min = new AtomicLong(Long.MAX_VALUE);
+        var consenus = new AtomicLong(0);
+        for (var x : futures) {
+            executor.submit(() -> {
+                try {
+                    min.set(Math.min(min.get(), x.get()));
+                    consenus.incrementAndGet();
+                    if (isMajority(consenus.get())) {
+                        if (min.get() != commitIndex && min.get() != Long.MAX_VALUE)
+                            commit(min.get());
+                    }
+                } catch (InterruptedException | ExecutionException e) {
+                    throw new RuntimeException(e);
+                }catch (IOException e){
+                    new RuntimeException("NEED TO RESTORE LOGS").printStackTrace();
                 }
 
             });
-
         }
+
     }
 
     @Override
     public @NonNull HeartBeatResponse recieveHeartBeat(HeartBeatRequest req) {
+        resetTimers();
         synchronized (lock) {
-//            logger.log("RECIEVED HEARTBEAT FROM:"+req.getLeaderID());
-//            logger.log(req.toString());
-            if (!req.getLogs().isEmpty()) {
-                logger.log(req.getLogs().toString());
-            }
             if (term <= req.getLeaderTerm()) {
                 if (state != RaftState.FOLLOWER) {
                     changeState(RaftState.FOLLOWER);
@@ -87,11 +129,27 @@ public class Raft implements Server {
                 return new HeartBeatResponse(this.term, false);
             }
             leaderID = req.getLeaderID();
-            //ACCEPT LOGS
-
             //RESET TIMER
-            resetTimers();
+
             voteFor(null);
+            //ACCEPT LOGS
+            if (req.getPrevLogIndex() < 0) {
+
+            } else if (req.getPrevLogIndex() > logs.size()) {
+                return new HeartBeatResponse(this.term, false);
+            }
+            logs.addAll(req.getLogs());
+            if (!req.getLogs().isEmpty()) {
+                logger.log(req.getLogs().toString());
+            }
+            if (req.getLeaderCommit() != commitIndex) {
+                try {
+                    commit(req.getLeaderCommit());
+                } catch (IOException e) {
+                    return null;
+                }
+            }
+
             return new HeartBeatResponse(this.term, true);
         }
     }
@@ -105,7 +163,7 @@ public class Raft implements Server {
             RequestVoteRequest request = new RequestVoteRequest();
             request.setId(id);
             request.setTerm(term);
-            request.setLastLogIndex(0);
+            request.setLastLogIndex(commitIndex);
             request.setLastLogTerm(0);
 
             var f = executor.submit(() -> {
@@ -192,28 +250,32 @@ public class Raft implements Server {
 
 
     private void mainLoop() {
-        switch (state) {
-            case LEADER -> {
-                sendHeartBeats();
-            }
-            case CANDIDATE -> {
-                synchronized (lock) {
-                    term++;
-                    voteFor(this.id);
-                    this.votesReceived = 1;
+        try {
+            switch (state) {
+                case LEADER -> {
+                    sendHeartBeats();
                 }
-                executor.execute(this::startElection);
+                case CANDIDATE -> {
+                    synchronized (lock) {
+                        term++;
+                        voteFor(this.id);
+                        this.votesReceived = 1;
+                    }
+                    executor.execute(this::startElection);
 
-            }
-            case FOLLOWER -> {
-                synchronized (lock) {
-                    term++;
-                    voteFor(this.id);
-                    this.votesReceived = 1;
-                    changeState(RaftState.CANDIDATE);
                 }
-                executor.execute(this::startElection);
+                case FOLLOWER -> {
+                    synchronized (lock) {
+                        term++;
+                        voteFor(this.id);
+                        this.votesReceived = 1;
+                        changeState(RaftState.CANDIDATE);
+                    }
+                    executor.execute(this::startElection);
+                }
             }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         resetTimers();
 
@@ -232,8 +294,11 @@ public class Raft implements Server {
             throw new RuntimeException("THREAD SIZE < 0");
         }
         logs = new LinkedList<>();
-        setLogIndex(logs.size());
-        changeState(RaftState.FOLLOWER);
+        this.commitIndex = logs.size() - 1;
+
+        aol = new AppendOnlyLog(config.logfile.toString());
+//        aol.writeLog(new Log(10,10,"Hello World"));
+
         executor.execute(this::mainLoop);
 
 //        executor.schedule(this::mainLoop, 150, TimeUnit.MILLISECONDS);
@@ -281,7 +346,7 @@ public class Raft implements Server {
         this.state = state;
         if (state == RaftState.LEADER) {
             for (var x : servers) {
-                x.setLogIndex(this.getLogIndex());
+                x.setLogIndex(this.logs.size());
             }
         }
         resetTimers();
@@ -291,34 +356,25 @@ public class Raft implements Server {
         System.out.println(log);
     }
 
-    private void commit(long index) {
-        while (!logs.isEmpty()) {
-            if (logs.getFirst().getIndex() <= index) {
-                //COMMIT LOG
-                commit(logs.getFirst());
-                logs.removeFirst();
-                break;
+    private synchronized void commit(long index) throws IOException {
+        synchronized (lock) {
+            commitIndex = index;
+            logger.log("COMMITING TO INDEX:" + index);
+            for (Log l : logs) {
+                aol.writeLog(l);
             }
         }
     }
 
-    public synchronized List<Log> getLogsAfter() {
-        return logs.stream().skip(commitIndex).toList();
-    }
-
-    @Override
-    public long getLogIndex() {
-        return commitIndex;
-    }
-
-    @Override
-    public void setLogIndex(long c) {
-        this.commitIndex = c;
-    }
 
     public synchronized boolean isMajority() {
-        return (2 * votesReceived > (this.servers.size() + 1));
+        return isMajority(votesReceived);
     }
+
+    public synchronized boolean isMajority(long val) {
+        return (2 * val > (this.servers.size() + 1));
+    }
+
 
     synchronized void resetTimers() {
         //RESET TIMER
