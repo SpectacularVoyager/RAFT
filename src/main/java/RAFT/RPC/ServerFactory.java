@@ -7,7 +7,7 @@ import java.util.Arrays;
 import java.util.Scanner;
 
 public class ServerFactory {
-    public static Server getServer(String name, long id) {
+    public static RPCServer getServer(String name, long id) {
         name = name.replace(" ", "");
         if (!name.contains("/")) {
             return new ServerTCP(fromString(name, id));

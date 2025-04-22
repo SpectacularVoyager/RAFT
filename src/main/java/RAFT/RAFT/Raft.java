@@ -31,7 +31,7 @@ public class Raft implements Server {
 
     private volatile long votesReceived = 0;
     ScheduledThreadPoolExecutor executor;
-    List<Server> servers;
+    List<RPCServer> servers;
     RPCManagerTCP manager;
 
     List<Log> logs;
@@ -44,7 +44,7 @@ public class Raft implements Server {
     }
 
     public void sendHeartBeats() {
-        for (Server x : servers) {
+        for (var x : servers) {
             //SEND HEARTBEAT
             HeartBeatRequest request = new HeartBeatRequest();
             request.setLeaderCommit(commitIndex);
@@ -53,7 +53,10 @@ public class Raft implements Server {
             request.setPrevLogIndex(0);
             request.setPrevLogTerm(0);
             request.setLogs(List.of());
-            var reply = x.sendHeartBeat(request);
+            var r = x.sendHeartBeat(request);
+            if(r.isEmpty())continue;
+            var reply=r.get();
+
 
             synchronized (lock) {
                 if (reply.term > this.term) {
@@ -132,14 +135,16 @@ public class Raft implements Server {
     }
 
     public void startElection() {
-        for (Server x : servers) {
+        for (var x : servers) {
             //SEND REQUEST VOTE
             RequestVoteRequest request = new RequestVoteRequest();
             request.setId(id);
             request.setTerm(term);
             request.setLastLogIndex(0);
             request.setLastLogTerm(0);
-            var reply = x.requestVote(request);
+            var r = x.requestVote(request);
+            if(r.isEmpty())continue;
+            var reply=r.get();
             synchronized (lock) {
                 if (reply.getTerm() > term) {
                     changeState(RaftState.FOLLOWER);
@@ -300,7 +305,7 @@ public class Raft implements Server {
         logger.log("CHANGED STATE TO:" + state);
         this.state = state;
         if (state == RaftState.LEADER) {
-            for (Server x : servers) {
+            for (var x : servers) {
                 x.setLogIndex(this.getLogIndex());
             }
         }

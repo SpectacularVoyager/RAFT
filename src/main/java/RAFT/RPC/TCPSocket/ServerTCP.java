@@ -6,8 +6,10 @@ import RAFT.RPC.Type.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.Optional;
+
 @Getter
-public class ServerTCP implements Server {
+public class ServerTCP implements RPCServer {
     long logIndex;
 
     public ServerTCP(ID id) {
@@ -22,24 +24,30 @@ public class ServerTCP implements Server {
     }
 
     @Override
-    public HeartBeatResponse sendHeartBeat(HeartBeatRequest req) {
+    public Optional<HeartBeatResponse> sendHeartBeat(HeartBeatRequest req) {
         HeartBeatResponse res = new HeartBeatResponse();
-        TcpImpl.RPC(RPC.HEARTBEAT, id, req, res);
-        return res;
+        if(TcpImpl.RPC(RPC.HEARTBEAT, id, req, res)){
+            return Optional.of(res);
+        }
+        return Optional.empty();
     }
 
     @Override
-    public RequestVoteResponse requestVote(RequestVoteRequest req) {
+    public Optional<RequestVoteResponse> requestVote(RequestVoteRequest req) {
         RequestVoteResponse res = new RequestVoteResponse();
-        TcpImpl.RPC(RPC.REQUEST_VOTE, id, req, res);
-        return res;
+        if(TcpImpl.RPC(RPC.REQUEST_VOTE, id, req, res)){
+            return Optional.of(res);
+        }
+        return Optional.empty();
     }
 
     @Override
-    public UpdateResponse update(RPCString req) {
+    public Optional<UpdateResponse> update(RPCString req) {
         UpdateResponse res = new UpdateResponse();
-        TcpImpl.RPC(RPC.UPDATE, id, req, res);
-        return res;
+        if(TcpImpl.RPC(RPC.UPDATE, id, req, res)){
+            return Optional.of(res);
+        }
+        return Optional.empty();
     }
 
     @Override

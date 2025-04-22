@@ -1,8 +1,10 @@
 package RAFT.RAFT;
 
+import RAFT.RPC.RPCServer;
 import RAFT.RPC.Server;
 import RAFT.RPC.ServerFactory;
 import RAFT.RPC.Type.ID;
+import RAFT.RPC.Type.RPC;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -19,7 +21,7 @@ import java.util.List;
 @AllArgsConstructor
 public class Config {
     ID id;
-    List<Server> servers = new ArrayList<>();
+    List<RPCServer> servers = new ArrayList<>();
     JSONParser parser = new JSONParser();
 
     public void addServer(JSONObject s) throws ParseException {
