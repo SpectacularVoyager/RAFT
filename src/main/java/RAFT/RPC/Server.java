@@ -6,7 +6,7 @@ public interface Server {
     ID getId();
     long getLogIndex();
     void setLogIndex(long c);
-    HeartBeatResponse sendHeartBeat(HeartBeatRequest req);
-    RequestVoteResponse requestVote(RequestVoteRequest req);
+    HeartBeatResponse recieveHeartBeat(HeartBeatRequest req);
+    RequestVoteResponse recieveRequestVote(RequestVoteRequest req);
     UpdateResponse update(RPCString string);
 }

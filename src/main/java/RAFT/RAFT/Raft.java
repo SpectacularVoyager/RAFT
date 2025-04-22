@@ -96,7 +96,7 @@ public class Raft implements Server {
     }
 
     @Override
-    public @NonNull HeartBeatResponse sendHeartBeat(HeartBeatRequest req) {
+    public @NonNull HeartBeatResponse recieveHeartBeat(HeartBeatRequest req) {
         synchronized (lock) {
 //            logger.log("RECIEVED HEARTBEAT FROM:"+req.getLeaderID());
 //            logger.log(req.toString());
@@ -144,6 +144,7 @@ public class Raft implements Server {
             request.setLastLogTerm(0);
             var r = x.requestVote(request);
             if(r.isEmpty())continue;
+
             var reply=r.get();
             synchronized (lock) {
                 if (reply.getTerm() > term) {
@@ -169,7 +170,7 @@ public class Raft implements Server {
     }
 
     @Override
-    public synchronized @NonNull RequestVoteResponse requestVote(RequestVoteRequest req) {
+    public synchronized @NonNull RequestVoteResponse recieveRequestVote(RequestVoteRequest req) {
 
         synchronized (lock) {
             //LOG STUFF
