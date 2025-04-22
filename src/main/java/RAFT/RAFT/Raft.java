@@ -103,7 +103,7 @@ public class Raft implements Server {
                     }
                 } catch (InterruptedException | ExecutionException e) {
                     throw new RuntimeException(e);
-                }catch (IOException e){
+                } catch (IOException e) {
                     new RuntimeException("NEED TO RESTORE LOGS").printStackTrace();
                 }
 
@@ -293,10 +293,12 @@ public class Raft implements Server {
             //LOG FATAL N CANNOT BE LESSER THAN 0
             throw new RuntimeException("THREAD SIZE < 0");
         }
-        logs = new LinkedList<>();
-        this.commitIndex = logs.size() - 1;
-
         aol = new AppendOnlyLog(config.logfile.toString());
+//        logs = aol.loadInitial();
+        logs=new ArrayList<>();
+        logger.log("LOADED LOGS:\t" + logs.size());
+        this.commitIndex = logs.size() ;
+
 //        aol.writeLog(new Log(10,10,"Hello World"));
 
         executor.execute(this::mainLoop);
