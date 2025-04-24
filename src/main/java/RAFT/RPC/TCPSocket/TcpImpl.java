@@ -36,6 +36,12 @@ public class TcpImpl {
 //            throw new RuntimeException(e);
         } catch (IOException e) {
             System.out.println(e);
+        } finally {
+            try {
+                socketChannel.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
         return true;
     }

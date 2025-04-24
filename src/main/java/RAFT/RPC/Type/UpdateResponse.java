@@ -49,7 +49,7 @@ public class UpdateResponse implements RPCMessage {
         buffer.flip();
         channel.write(buffer);
         if (res == null) res = new ID(0, 0, "");
-        res.get(channel);
+        res = new ID(channel);
 
 
     }
@@ -63,7 +63,7 @@ public class UpdateResponse implements RPCMessage {
         success = buffer.get() != 0;
         buffer.flip();
         channel.write(buffer);
-        res.get(channel);
+        res=new ID(channel);
     }
 }
 

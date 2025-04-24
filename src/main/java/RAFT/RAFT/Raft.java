@@ -114,6 +114,7 @@ public class Raft implements Server {
 
     @Override
     public @NonNull HeartBeatResponse recieveHeartBeat(HeartBeatRequest req) {
+//        System.out.println(req.getPrevLogIndex());
         resetTimers();
         synchronized (lock) {
             if (term <= req.getLeaderTerm()) {
@@ -213,6 +214,12 @@ public class Raft implements Server {
             //LOG STUFF
 
             if (commitIndex > req.getLastLogIndex()) {
+                //MATCH TERM???(HAVE TO CHECK VALIDITY FOR THIS)
+                if (term != req.getTerm()) {
+                    logger.logf("UPDATED TERM TO [%d] <- [%d]\n", req.getTerm(), term);
+                    term = req.getTerm();
+                }
+
                 return rejectVote(req, "OLD LOGS");
             }
             if (term < req.getTerm()) {
@@ -294,10 +301,10 @@ public class Raft implements Server {
             throw new RuntimeException("THREAD SIZE < 0");
         }
         aol = new AppendOnlyLog(config.logfile.toString());
-//        logs = aol.loadInitial();
-        logs=new ArrayList<>();
+        logs = aol.loadInitial();
+//        logs=new ArrayList<>();
         logger.log("LOADED LOGS:\t" + logs.size());
-        this.commitIndex = logs.size() ;
+        this.commitIndex = logs.size();
 
 //        aol.writeLog(new Log(10,10,"Hello World"));
 
@@ -354,43 +361,41 @@ public class Raft implements Server {
         resetTimers();
     }
 
-    private void commit(Log log) {
-        System.out.println(log);
-    }
 
     private synchronized void commit(long index) throws IOException {
         synchronized (lock) {
-            commitIndex = index;
             logger.log("COMMITING TO INDEX:" + index);
-            for (Log l : logs) {
-                aol.writeLog(l);
+            for (long i = commitIndex; i < index; i++) {
+                aol.writeLog(logs.get((int) i));
             }
+            commitIndex = index;
         }
     }
 
 
-    public synchronized boolean isMajority() {
-        return isMajority(votesReceived);
+
+public synchronized boolean isMajority() {
+    return isMajority(votesReceived);
+}
+
+public synchronized boolean isMajority(long val) {
+    return (2 * val > (this.servers.size() + 1));
+}
+
+
+synchronized void resetTimers() {
+    //RESET TIMER
+    if (timer != null) {
+        timer.cancel(true);
     }
+    timer = executor.schedule(this::mainLoop, getDelay(), TimeUnit.MILLISECONDS);
 
-    public synchronized boolean isMajority(long val) {
-        return (2 * val > (this.servers.size() + 1));
-    }
+}
 
-
-    synchronized void resetTimers() {
-        //RESET TIMER
-        if (timer != null) {
-            timer.cancel(true);
-        }
-        timer = executor.schedule(this::mainLoop, getDelay(), TimeUnit.MILLISECONDS);
-
-    }
-
-    public RequestVoteResponse rejectVote(RequestVoteRequest x, String s) {
-        logger.logf("REJECTED VOTE [%d] FOR [%s]:\t%s\n", term, x.getId().toString(), s);
-        return new RequestVoteResponse(x.getTerm(), false);
-    }
+public RequestVoteResponse rejectVote(RequestVoteRequest x, String s) {
+    logger.logf("REJECTED VOTE [%d] FOR [%s]:\t%s\n", term, x.getId().toString(), s);
+    return new RequestVoteResponse(x.getTerm(), false);
+}
 
 
 }
