@@ -59,13 +59,13 @@ public class Raft implements Server {
             request.setLeaderID(id);
             request.setLeaderTerm(term);
             request.setPrevLogIndex(x.getLogIndex());
-            if (x.getLogIndex() >= 0) {
-                var l = logs.get((int) x.getLogIndex()-1);
-                request.setPrevLogTerm(l.getTerm());
-            } else {
-                request.setPrevLogTerm(0);
-            }
-            request.setLogs(logs.subList((int) Math.max(x.getLogIndex(), 0), logs.size()));
+            request.setLogs(logs.subList(Math.min((int) x.getLogIndex() + 1, logs.size()), logs.size()));
+//            if (x.getLogIndex() >= 0) {
+//                var l = logs.get((int) x.getLogIndex()-1);
+//                request.setPrevLogTerm(l.getTerm());
+//            } else {
+//                request.setPrevLogTerm(0);
+//            }
             var f = executor.submit(new Callable<Long>() {
                 @Override
                 public Long call() throws Exception {
@@ -81,10 +81,11 @@ public class Raft implements Server {
                         }
                         if (!reply.success) {
                             x.setLogIndex(Math.max(x.getLogIndex() - 1, -1));
-//                        logger.log("CANNOT APPEND TO:" + x.getId() + "\tTRYING WITH INDEX:" + x.getLogIndex());
+                            logger.log("CANNOT APPEND TO:" + x.getId() + "\tTRYING WITH INDEX:" + x.getLogIndex());
 
                         } else {
-                            x.setLogIndex(logs.size());
+//                            logger.log("HEARTBEAT");
+                            x.setLogIndex(logs.size() - 1);
                             return x.getLogIndex();
                         }
                     }
@@ -103,8 +104,10 @@ public class Raft implements Server {
                     min.set(Math.min(min.get(), x.get()));
                     consenus.incrementAndGet();
                     if (isMajority(consenus.get())) {
-                        if (min.get() != commitIndex && min.get() != Long.MAX_VALUE)
+                        if (min.get() != commitIndex && min.get() != Long.MAX_VALUE) {
+                            System.out.println(min.get()+"\t"+commitIndex);
                             commit(min.get());
+                        }
                     }
                 } catch (InterruptedException | ExecutionException e) {
                     throw new RuntimeException(e);
@@ -143,16 +146,20 @@ public class Raft implements Server {
                 //NO LOGS
             } else {
                 if (req.getPrevLogIndex() >= logs.size()) {
-                    return new HeartBeatResponse(this.term, false);
-                } else if (logs.get((int) req.getPrevLogIndex()).getTerm() != req.getPrevLogTerm()) {
-                    logger.logf("MISMATCH TERM IN LOG:%s ASKING LEADER TO REVERT", logs.get((int) req.getPrevLogTerm()));
+                    logger.log("REJECTING HEARTBEAT FOR LOGS:" + req.getPrevLogIndex());
                     return new HeartBeatResponse(this.term, false);
                 }
+//                else if (logs.get((int) req.getPrevLogIndex()).getTerm() != req.getPrevLogTerm()) {
+//                    logger.logf("MISMATCH TERM IN LOG:%s ASKING LEADER TO REVERT", logs.get((int) req.getPrevLogTerm()));
+//                    return new HeartBeatResponse(this.term, false);
+//                }
             }
+//            logs.subList(0,(int)req.getLeaderCommit());
             logs.addAll(req.getLogs());
             if (!req.getLogs().isEmpty()) {
                 logger.log(req.getLogs().toString());
             }
+//            logger.log(logs.toString());
             if (req.getLeaderCommit() != commitIndex) {
                 try {
                     commit(req.getLeaderCommit());
@@ -314,7 +321,7 @@ public class Raft implements Server {
         logs = aol.loadInitial();
 //        logs=new ArrayList<>();
         logger.log("LOADED LOGS:\t" + logs.size());
-        this.commitIndex = logs.size();
+        this.commitIndex = logs.size() - 1;
 
 //        aol.writeLog(new Log(10,10,"Hello World"));
 
@@ -375,7 +382,7 @@ public class Raft implements Server {
     private synchronized void commit(long index) throws IOException {
         synchronized (lock) {
             logger.log("COMMITING TO INDEX:" + index);
-            for (long i = commitIndex; i < index; i++) {
+            for (long i = commitIndex+1; i <= index; i++) {
                 aol.writeLog(logs.get((int) i));
             }
             commitIndex = index;
