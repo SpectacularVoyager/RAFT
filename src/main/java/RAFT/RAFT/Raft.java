@@ -59,7 +59,12 @@ public class Raft implements Server {
             request.setLeaderID(id);
             request.setLeaderTerm(term);
             request.setPrevLogIndex(x.getLogIndex());
-            request.setPrevLogTerm(0);
+            if (x.getLogIndex() >= 0) {
+                var l = logs.get((int) x.getLogIndex()-1);
+                request.setPrevLogTerm(l.getTerm());
+            } else {
+                request.setPrevLogTerm(0);
+            }
             request.setLogs(logs.subList((int) Math.max(x.getLogIndex(), 0), logs.size()));
             var f = executor.submit(new Callable<Long>() {
                 @Override
@@ -135,9 +140,14 @@ public class Raft implements Server {
             voteFor(null);
             //ACCEPT LOGS
             if (req.getPrevLogIndex() < 0) {
-
-            } else if (req.getPrevLogIndex() > logs.size()) {
-                return new HeartBeatResponse(this.term, false);
+                //NO LOGS
+            } else {
+                if (req.getPrevLogIndex() >= logs.size()) {
+                    return new HeartBeatResponse(this.term, false);
+                } else if (logs.get((int) req.getPrevLogIndex()).getTerm() != req.getPrevLogTerm()) {
+                    logger.logf("MISMATCH TERM IN LOG:%s ASKING LEADER TO REVERT", logs.get((int) req.getPrevLogTerm()));
+                    return new HeartBeatResponse(this.term, false);
+                }
             }
             logs.addAll(req.getLogs());
             if (!req.getLogs().isEmpty()) {
@@ -373,29 +383,28 @@ public class Raft implements Server {
     }
 
 
-
-public synchronized boolean isMajority() {
-    return isMajority(votesReceived);
-}
-
-public synchronized boolean isMajority(long val) {
-    return (2 * val > (this.servers.size() + 1));
-}
-
-
-synchronized void resetTimers() {
-    //RESET TIMER
-    if (timer != null) {
-        timer.cancel(true);
+    public synchronized boolean isMajority() {
+        return isMajority(votesReceived);
     }
-    timer = executor.schedule(this::mainLoop, getDelay(), TimeUnit.MILLISECONDS);
 
-}
+    public synchronized boolean isMajority(long val) {
+        return (2 * val > (this.servers.size() + 1));
+    }
 
-public RequestVoteResponse rejectVote(RequestVoteRequest x, String s) {
-    logger.logf("REJECTED VOTE [%d] FOR [%s]:\t%s\n", term, x.getId().toString(), s);
-    return new RequestVoteResponse(x.getTerm(), false);
-}
+
+    synchronized void resetTimers() {
+        //RESET TIMER
+        if (timer != null) {
+            timer.cancel(true);
+        }
+        timer = executor.schedule(this::mainLoop, getDelay(), TimeUnit.MILLISECONDS);
+
+    }
+
+    public RequestVoteResponse rejectVote(RequestVoteRequest x, String s) {
+        logger.logf("REJECTED VOTE [%d] FOR [%s]:\t%s\n", term, x.getId().toString(), s);
+        return new RequestVoteResponse(x.getTerm(), false);
+    }
 
 
 }

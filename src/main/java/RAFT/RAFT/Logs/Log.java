@@ -11,7 +11,6 @@ import java.nio.channels.ByteChannel;
 
 @Getter
 @Setter
-@ToString
 @AllArgsConstructor
 @NoArgsConstructor
 public class Log implements RPCMessage {
@@ -57,4 +56,8 @@ public class Log implements RPCMessage {
         get(channel);
     }
 
+    @Override
+    public String toString() {
+        return message.toString();
+    }
 }
