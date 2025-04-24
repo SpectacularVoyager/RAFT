@@ -60,12 +60,13 @@ public class Raft implements Server {
             request.setLeaderTerm(term);
             request.setPrevLogIndex(x.getLogIndex());
             request.setLogs(logs.subList(Math.min((int) x.getLogIndex() + 1, logs.size()), logs.size()));
-//            if (x.getLogIndex() >= 0) {
-//                var l = logs.get((int) x.getLogIndex()-1);
-//                request.setPrevLogTerm(l.getTerm());
-//            } else {
-//                request.setPrevLogTerm(0);
-//            }
+            if (x.getLogIndex() >= 0 && x.getLogIndex() < logs.size()) {
+                var l = logs.get((int) x.getLogIndex());
+//                System.out.println(l);
+                request.setPrevLogTerm(l.getTerm());
+            } else {
+                request.setPrevLogTerm(-1);
+            }
             var f = executor.submit(new Callable<Long>() {
                 @Override
                 public Long call() throws Exception {
@@ -105,7 +106,7 @@ public class Raft implements Server {
                     consenus.incrementAndGet();
                     if (isMajority(consenus.get())) {
                         if (min.get() != commitIndex && min.get() != Long.MAX_VALUE) {
-                            System.out.println(min.get()+"\t"+commitIndex);
+                            System.out.println(min.get() + "\t" + commitIndex);
                             commit(min.get());
                         }
                     }
@@ -149,12 +150,12 @@ public class Raft implements Server {
                     logger.log("REJECTING HEARTBEAT FOR LOGS:" + req.getPrevLogIndex());
                     return new HeartBeatResponse(this.term, false);
                 }
-//                else if (logs.get((int) req.getPrevLogIndex()).getTerm() != req.getPrevLogTerm()) {
-//                    logger.logf("MISMATCH TERM IN LOG:%s ASKING LEADER TO REVERT", logs.get((int) req.getPrevLogTerm()));
-//                    return new HeartBeatResponse(this.term, false);
-//                }
+                else if (logs.get((int) req.getPrevLogIndex()).getTerm() != req.getPrevLogTerm()) {
+                    logger.logf("MISMATCH TERM IN LOG:%s ASKING LEADER TO REVERT", logs.get((int) req.getPrevLogTerm()));
+                    return new HeartBeatResponse(this.term, false);
+                }
             }
-//            logs.subList(0,(int)req.getLeaderCommit());
+//            logs=logs.subList(0,(int)req.getLeaderCommit()+1);
             logs.addAll(req.getLogs());
             if (!req.getLogs().isEmpty()) {
                 logger.log(req.getLogs().toString());
@@ -382,7 +383,7 @@ public class Raft implements Server {
     private synchronized void commit(long index) throws IOException {
         synchronized (lock) {
             logger.log("COMMITING TO INDEX:" + index);
-            for (long i = commitIndex+1; i <= index; i++) {
+            for (long i = commitIndex + 1; i <= index; i++) {
                 aol.writeLog(logs.get((int) i));
             }
             commitIndex = index;
