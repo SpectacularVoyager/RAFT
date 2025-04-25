@@ -20,6 +20,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -67,10 +68,17 @@ public class Raft implements Server {
             } else {
                 request.setPrevLogTerm(-1);
             }
+            Optional<HeartBeatResponse> r;
+            try {
+                r = x.sendHeartBeat(request);
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
             var f = executor.submit(new Callable<Long>() {
                 @Override
                 public Long call() throws Exception {
-                    var r = x.sendHeartBeat(request);
+
                     if (r.isEmpty()) return Long.MAX_VALUE;
                     ;
                     var reply = r.get();
@@ -111,9 +119,9 @@ public class Raft implements Server {
                         }
                     }
                 } catch (InterruptedException | ExecutionException e) {
-                    throw new RuntimeException(e);
+                    e.printStackTrace();
                 } catch (IOException e) {
-                    new RuntimeException("NEED TO RESTORE LOGS").printStackTrace();
+                    e.printStackTrace();
                 }
 
             });
@@ -149,8 +157,7 @@ public class Raft implements Server {
                 if (req.getPrevLogIndex() >= logs.size()) {
                     logger.log("REJECTING HEARTBEAT FOR LOGS:" + req.getPrevLogIndex());
                     return new HeartBeatResponse(this.term, false);
-                }
-                else if (logs.get((int) req.getPrevLogIndex()).getTerm() != req.getPrevLogTerm()) {
+                } else if (logs.get((int) req.getPrevLogIndex()).getTerm() != req.getPrevLogTerm()) {
                     logger.logf("MISMATCH TERM IN LOG:%s ASKING LEADER TO REVERT", logs.get((int) req.getPrevLogTerm()));
                     return new HeartBeatResponse(this.term, false);
                 }
@@ -184,9 +191,14 @@ public class Raft implements Server {
             request.setTerm(term);
             request.setLastLogIndex(commitIndex);
             request.setLastLogTerm(0);
-
+            Optional<RequestVoteResponse> r;
+            try {
+                r = x.requestVote(request);
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
             var f = executor.submit(() -> {
-                var r = x.requestVote(request);
                 phaser.arrive();
                 if (r.isEmpty()) return;
 

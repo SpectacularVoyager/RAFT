@@ -43,14 +43,15 @@ public class RPCManagerTCP implements Runnable {
                 handleRPC(function, socketChannel);
                 socketChannel.close();
             }
-        } catch (SocketException e) {
-//            System.out.println(e);
+        } catch (BufferUnderflowException e) {
+            System.out.println(e);
+            System.out.println("EXPECTED BUFFER IN CHANNEL");
         } catch (IOException e) {
-//            System.out.println(e);
+            e.printStackTrace();
         }
     }
 
-    void handleRPC(@NonNull int type, SocketChannel chan) {
+    void handleRPC(@NonNull int type, SocketChannel chan) throws IOException {
         try {
             switch (type) {
                 case RPC.HEARTBEAT -> {
@@ -73,16 +74,8 @@ public class RPCManagerTCP implements Runnable {
 
                 }
             }
-        } catch (BufferUnderflowException e) {
-
-            System.out.println(e);
-        } catch (Exception e) {
         } finally {
-            try {
-                chan.close();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            chan.close();
         }
     }
 }
