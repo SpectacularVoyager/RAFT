@@ -1,5 +1,6 @@
-package RAFT.RPC.Type;
+package RAFT.RAFT.RPCType;
 
+import RAFT.RPC.Type.RPCMessage;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -8,8 +9,6 @@ import lombok.Setter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
-import java.nio.channels.Channel;
-import java.nio.channels.SocketChannel;
 
 @Getter
 @Setter

@@ -1,10 +1,9 @@
 package RAFT.RPC;
 
 import RAFT.RPC.TCPSocket.ServerTCP;
-import RAFT.RPC.Type.ID;
+import RAFT.RAFT.RPCType.ID;
 
 import java.util.Arrays;
-import java.util.Scanner;
 
 public class ServerFactory {
     public static RPCServer getServer(String name, long id) {

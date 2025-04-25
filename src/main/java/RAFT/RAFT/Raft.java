@@ -4,25 +4,18 @@ import Logging.AnsiColor;
 import Logging.AppendOnlyLog;
 import Logging.RaftLogger;
 import RAFT.RAFT.Logs.Log;
+import RAFT.RAFT.RPCType.*;
 import RAFT.RPC.*;
 import RAFT.RPC.TCPSocket.RPCManagerTCP;
 import RAFT.RPC.Type.*;
 import lombok.Getter;
 import lombok.NonNull;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class Raft implements Server {
@@ -130,7 +123,7 @@ public class Raft implements Server {
     }
 
     @Override
-    public @NonNull HeartBeatResponse recieveHeartBeat(HeartBeatRequest req) {
+    public @NonNull HeartBeatResponse receiveHeartBeat(HeartBeatRequest req) {
 //        System.out.println(req.getPrevLogIndex());
         resetTimers();
         synchronized (lock) {
@@ -238,7 +231,7 @@ public class Raft implements Server {
     }
 
     @Override
-    public synchronized @NonNull RequestVoteResponse recieveRequestVote(RequestVoteRequest req) {
+    public synchronized @NonNull RequestVoteResponse receiveRequestVote(RequestVoteRequest req) {
 
         synchronized (lock) {
             //LOG STUFF
@@ -281,7 +274,7 @@ public class Raft implements Server {
                 return new UpdateResponse(leaderID);
             Log l = new Log(logs.size(), term, string);
             logs.add(l);
-            return new UpdateResponse(l);
+            return new UpdateResponse(l,this.id);
         }
     }
 

@@ -1,5 +1,6 @@
-package RAFT.RPC.Type;
+package RAFT.RAFT.RPCType;
 
+import RAFT.RPC.Type.RPCMessage;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -13,38 +14,31 @@ import java.nio.channels.ByteChannel;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class RequestVoteRequest implements RPCMessage {
-    ID id;
-    long term;
-    long lastLogIndex;
-    long lastLogTerm;
+public class HeartBeatResponse implements RPCMessage {
+    public long term;
+    public boolean success;
+
+    public HeartBeatResponse(ByteChannel chan) throws IOException {
+        get(chan);
+    }
 
     @Override
     public void put(ByteChannel channel) throws IOException {
-        ByteBuffer out = ByteBuffer.allocate(24);
-        id.put(channel);
+        ByteBuffer out = ByteBuffer.allocate(9);
         out.clear();
         out.putLong(term);
-        out.putLong(lastLogIndex);
-        out.putLong(lastLogTerm);
+        out.put(success ? (byte) 1 : 0);
         out.flip();
         channel.write(out);
-
     }
 
     @Override
     public void get(ByteChannel channel) throws IOException {
-        ByteBuffer in = ByteBuffer.allocate(24);
-        id = new ID(channel);
+        ByteBuffer in = ByteBuffer.allocate(9);
         in.clear();
         channel.read(in);
         in.flip();
         term = in.getLong();
-        lastLogIndex = in.getLong();
-        lastLogTerm = in.getLong();
-    }
-
-    public RequestVoteRequest(ByteChannel channel) throws IOException {
-        get(channel);
+        success = in.get() != 0;
     }
 }

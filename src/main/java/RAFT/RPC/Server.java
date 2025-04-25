@@ -1,10 +1,11 @@
 package RAFT.RPC;
 
+import RAFT.RAFT.RPCType.*;
 import RAFT.RPC.Type.*;
 
 public interface Server {
     ID getId();
-    HeartBeatResponse recieveHeartBeat(HeartBeatRequest req);
-    RequestVoteResponse recieveRequestVote(RequestVoteRequest req);
+    HeartBeatResponse receiveHeartBeat(HeartBeatRequest req);
+    RequestVoteResponse receiveRequestVote(RequestVoteRequest req);
     UpdateResponse update(RPCString string);
 }

@@ -1,10 +1,9 @@
 package RAFT.RPC.TCPSocket;
 
-import RAFT.RPC.Type.ID;
+import RAFT.RAFT.RPCType.*;
 import RAFT.RPC.*;
 import RAFT.RPC.Type.*;
 import lombok.Getter;
-import lombok.Setter;
 
 import java.io.IOException;
 import java.util.Optional;

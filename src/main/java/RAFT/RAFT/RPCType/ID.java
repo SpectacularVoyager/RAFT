@@ -1,6 +1,7 @@
-package RAFT.RPC.Type;
+package RAFT.RAFT.RPCType;
 
-import lombok.AllArgsConstructor;
+import RAFT.RPC.Type.RPCMessage;
+import RAFT.RPC.Type.RPCString;
 import lombok.Getter;
 
 import java.io.IOException;

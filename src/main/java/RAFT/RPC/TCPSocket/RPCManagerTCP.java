@@ -1,12 +1,12 @@
 package RAFT.RPC.TCPSocket;
 
+import RAFT.RAFT.RPCType.*;
 import RAFT.RAFT.Raft;
 import RAFT.RPC.Type.*;
 import lombok.NonNull;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.SocketException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
@@ -56,12 +56,12 @@ public class RPCManagerTCP implements Runnable {
             switch (type) {
                 case RPC.HEARTBEAT -> {
                     HeartBeatRequest req = new HeartBeatRequest(chan);
-                    HeartBeatResponse resp = r.recieveHeartBeat(req);
+                    HeartBeatResponse resp = r.receiveHeartBeat(req);
                     resp.put(chan);
                 }
                 case RPC.REQUEST_VOTE -> {
                     RequestVoteRequest req = new RequestVoteRequest(chan);
-                    RequestVoteResponse resp = r.recieveRequestVote(req);
+                    RequestVoteResponse resp = r.receiveRequestVote(req);
                     resp.put(chan);
                 }
                 case RPC.UPDATE -> {

@@ -1,6 +1,5 @@
 package RAFT.RAFT.Logs;
 
-import RAFT.RPC.Type.ID;
 import RAFT.RPC.Type.RPCMessage;
 import RAFT.RPC.Type.RPCString;
 import lombok.*;

@@ -1,4 +1,4 @@
-package RAFT.RPC.Type;
+package RAFT.RAFT.RPCType;
 
 import RAFT.RAFT.Logs.Log;
 import lombok.*;
@@ -6,7 +6,6 @@ import lombok.*;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
-import java.nio.charset.StandardCharsets;
 
 import RAFT.RPC.Type.RPCMessage;
 
@@ -25,10 +24,10 @@ public class UpdateResponse implements RPCMessage {
         get(channel);
     }
 
-    public UpdateResponse(Log l) {
+    public UpdateResponse(Log l,ID leader) {
         this.index = l.getIndex();
         this.term = l.getTerm();
-        res = new ID(0, 0, "");
+        res = leader;
         this.success = true;
     }
 
@@ -48,8 +47,8 @@ public class UpdateResponse implements RPCMessage {
         buffer.put(success ? (byte) 1 : 0);
         buffer.flip();
         channel.write(buffer);
-        if (res == null) res = new ID(0, 0, "");
-        res = new ID(channel);
+        if (res == null) res = new ID(0, 0, "IDK");
+        res.put(channel);
 
 
     }
@@ -58,11 +57,11 @@ public class UpdateResponse implements RPCMessage {
     public void get(ByteChannel channel) throws IOException {
         ByteBuffer buffer = ByteBuffer.allocate(17);
         buffer.clear();
+        channel.read(buffer);
+        buffer.flip();
         index = buffer.getLong();
         term = buffer.getLong();
         success = buffer.get() != 0;
-        buffer.flip();
-        channel.write(buffer);
         res=new ID(channel);
     }
 }

@@ -1,6 +1,6 @@
 package RAFT.RPC.TCPSocket;
 
-import RAFT.RPC.Type.ID;
+import RAFT.RAFT.RPCType.ID;
 import RAFT.RPC.Type.RPCMessage;
 
 import java.io.IOException;

@@ -1,6 +1,7 @@
-package RAFT.RPC.Type;
+package RAFT.RAFT.RPCType;
 
 import RAFT.RAFT.Logs.Log;
+import RAFT.RPC.Type.RPCMessage;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

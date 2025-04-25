@@ -1,5 +1,6 @@
 package RAFT.RPC;
 
+import RAFT.RAFT.RPCType.*;
 import RAFT.RPC.Type.*;
 
 import java.io.IOException;

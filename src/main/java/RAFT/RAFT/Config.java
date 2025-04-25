@@ -1,10 +1,8 @@
 package RAFT.RAFT;
 
 import RAFT.RPC.RPCServer;
-import RAFT.RPC.Server;
 import RAFT.RPC.ServerFactory;
-import RAFT.RPC.Type.ID;
-import RAFT.RPC.Type.RPC;
+import RAFT.RAFT.RPCType.ID;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;

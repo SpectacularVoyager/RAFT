@@ -1,10 +1,7 @@
 <component name="ArtifactManager">
-  <artifact type="jar" build-on-make="true" name="RAFT">
-    <output-path>$PROJECT_DIR$/out/artifacts/RAFT</output-path>
+  <artifact type="jar" build-on-make="true" name="Client">
+    <output-path>$PROJECT_DIR$/out/artifacts/Client</output-path>
     <root id="archive" name="RAFT.jar">
-      <element id="directory" name="META-INF">
-        <element id="file-copy" path="$PROJECT_DIR$/META-INF/MANIFEST.MF" />
-      </element>
       <element id="module-output" name="RAFT" />
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/hamcrest/hamcrest-core/1.1/hamcrest-core-1.1.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/slf4j/slf4j-api/1.7.25/slf4j-api-1.7.25.jar" path-in-jar="/" />
