@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ByteChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ExecutorService;
@@ -51,7 +52,7 @@ public class RPCManagerTCP implements Runnable {
         }
     }
 
-    void handleRPC(@NonNull int type, SocketChannel chan) throws IOException {
+    void handleRPC(@NonNull int type, ByteChannel chan) throws IOException {
         try {
             switch (type) {
                 case RPC.HEARTBEAT -> {
@@ -69,6 +70,11 @@ public class RPCManagerTCP implements Runnable {
                     UpdateResponse resp = r.update(req);
                     resp.put(chan);
                 }
+                case RPC.STATUS -> {
+                    RaftStatus resp = r.status();
+                    resp.put(chan);
+                }
+
                 default -> {
                     r.getLogger().logf("INVALID RPC FUNCTION[%d]\n", type);
 

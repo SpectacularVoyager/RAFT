@@ -8,4 +8,5 @@ public interface Server {
     HeartBeatResponse receiveHeartBeat(HeartBeatRequest req);
     RequestVoteResponse receiveRequestVote(RequestVoteRequest req);
     UpdateResponse update(RPCString string);
+    RaftStatus status();
 }

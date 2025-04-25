@@ -274,8 +274,19 @@ public class Raft implements Server {
                 return new UpdateResponse(leaderID);
             Log l = new Log(logs.size(), term, string);
             logs.add(l);
-            return new UpdateResponse(l,this.id);
+            return new UpdateResponse(l, this.id);
         }
+    }
+
+    @Override
+    public RaftStatus status() {
+        RaftStatus status = new RaftStatus();
+        status.setId(this.getId());
+        status.setLogs(logs);
+        status.setTerm(this.term);
+        status.setState(new RPCString(this.state.toString()));
+        status.setCommited(commitIndex);
+        return status;
     }
 
 

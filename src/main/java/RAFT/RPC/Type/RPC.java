@@ -4,4 +4,5 @@ public class RPC {
     public static final int HEARTBEAT=1;
     public static final int REQUEST_VOTE=2;
     public static final int UPDATE=3;
+    public static final int STATUS=4;
 }
