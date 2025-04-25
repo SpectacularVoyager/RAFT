@@ -15,12 +15,13 @@ import java.util.Scanner;
 public class UpdateClient {
     RaftLogger log = new RaftLogger();
 
+    RPCServer server = ServerFactory.getServer("tcp/localhost:8000", 1);
+
     public static void main(String[] args) throws IOException {
         new UpdateClient();
     }
 
     UpdateClient() throws IOException {
-        RPCServer server = ServerFactory.getServer("tcp/localhost:8000", 1);
         Scanner in = new Scanner(System.in);
         log.log("TYPE MESSAGE TO SEND TO:\t" + server);
         log.setFormat(AnsiColor.GREEN, 0, 0);
@@ -31,24 +32,44 @@ public class UpdateClient {
             log.setFormat(AnsiColor.WHITE, 0, 0);
 
             String line = in.nextLine();
-            if (line.startsWith("changeaddr")) {
-                System.out.println(line);
-                server= ServerFactory.getServer(line.split(" ")[1], 1);
-                log.setFormat(AnsiColor.GREEN, 0, 0);
-                System.out.println("CHANGING SERVER ADDRESS TO:\t"+server);
-                continue;
-            }
-            var v = server.update(new RPCString(line));
-            if (v.isEmpty()) {
+            String[] s = line.split(" ");
+            if (line.startsWith("exit")) {
+                System.out.println("BYE");
+                System.exit(0);
+            } else if (s.length < 2) {
                 log.setFormat(AnsiColor.RED, 0, 0);
-                System.out.println("COULD NOT REACH SERVER");
-            } else if (v.get().isSuccess()) {
-                log.setFormat(AnsiColor.GREEN, 0, 0);
-                System.out.println(v);
+                System.out.println("USAGE: send [MESSAGE]   |   changeaddr [addr]");
+
+            } else if (line.startsWith("changeaddr")) {
+                changeAddr(s[1]);
+            } else if (line.startsWith("send")) {
+                send(s[1]);
             } else {
-                log.setFormat(AnsiColor.YELLOW, 0, 0);
-                System.out.println(v);
+                System.out.println("USAGE: send [MESSAGE]   |   changeaddr [addr]");
             }
+
+
+        }
+    }
+
+    void changeAddr(String addr) {
+        server = ServerFactory.getServer(addr, 1);
+        log.setFormat(AnsiColor.GREEN, 0, 0);
+        System.out.println("CHANGING SERVER ADDRESS TO:\t" + server);
+
+    }
+
+    void send(String line) throws IOException {
+        var v = server.update(new RPCString(line));
+        if (v.isEmpty()) {
+            log.setFormat(AnsiColor.RED, 0, 0);
+            System.out.println("COULD NOT REACH SERVER");
+        } else if (v.get().isSuccess()) {
+            log.setFormat(AnsiColor.GREEN, 0, 0);
+            System.out.println(v);
+        } else {
+            log.setFormat(AnsiColor.YELLOW, 0, 0);
+            System.out.println(v);
         }
     }
 
