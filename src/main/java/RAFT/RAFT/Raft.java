@@ -3,6 +3,7 @@ package RAFT.RAFT;
 import Logging.AnsiColor;
 import Logging.AppendOnlyLog;
 import Logging.RaftLogger;
+import RAFT.ClientUpdate;
 import RAFT.RAFT.Logs.Log;
 import RAFT.RAFT.RPCType.*;
 import RAFT.RPC.*;
@@ -10,6 +11,7 @@ import RAFT.RPC.TCPSocket.RPCManagerTCP;
 import RAFT.RPC.Type.*;
 import lombok.Getter;
 import lombok.NonNull;
+import lombok.Setter;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -39,6 +41,11 @@ public class Raft implements Server {
     private ID leaderID;
     long commitIndex = -1;
     AppendOnlyLog aol;
+    Optional<ClientUpdate> clientUpdate = Optional.empty();
+
+    public void setClientUpdate(ClientUpdate update) {
+        clientUpdate = Optional.of(update);
+    }
 
     private volatile ScheduledFuture<?> timer = null;
 
@@ -400,7 +407,9 @@ public class Raft implements Server {
         synchronized (lock) {
             logger.log("COMMITING TO INDEX:" + index);
             for (long i = commitIndex + 1; i <= index; i++) {
+                Log l = logs.get((int) i);
                 aol.writeLog(logs.get((int) i));
+                clientUpdate.ifPresent(x -> x.update(l));
             }
             commitIndex = index;
         }

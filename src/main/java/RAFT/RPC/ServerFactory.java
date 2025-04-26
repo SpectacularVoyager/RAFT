@@ -15,7 +15,7 @@ public class ServerFactory {
             if (split[0].equals("tcp")) {
                 return new ServerTCP(fromString(split[1], id));
             } else {
-                return null;
+                throw new UnsupportedOperationException("ONLY SUPPORTS TCP");
             }
         }
     }

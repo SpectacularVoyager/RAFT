@@ -1,14 +1,12 @@
-package Client;
+package client;
 
 import Logging.AnsiColor;
 import Logging.RaftLogger;
 import RAFT.RPC.RPCServer;
-import RAFT.RPC.Server;
 import RAFT.RPC.ServerFactory;
-import RAFT.RPC.TCPSocket.ServerTCP;
 import RAFT.RPC.Type.RPCString;
+import lombok.SneakyThrows;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.Scanner;
 
@@ -36,20 +34,38 @@ public class UpdateClient {
             if (line.startsWith("exit")) {
                 System.out.println("BYE");
                 System.exit(0);
-            } else if (s.length < 2) {
-                log.setFormat(AnsiColor.RED, 0, 0);
-                System.out.println("USAGE: send [MESSAGE]   |   changeaddr [addr]");
-
             } else if (line.startsWith("changeaddr")) {
+                if (s.length < 2) {
+                    log.setFormat(AnsiColor.RED, 0, 0);
+                    System.out.println("USAGE: changeaddr [addr]");
+                    continue;
+                }
                 changeAddr(s[1]);
             } else if (line.startsWith("send")) {
+                if (s.length < 2) {
+                    log.setFormat(AnsiColor.RED, 0, 0);
+                    System.out.println("USAGE: send [MESSAGE]");
+                    continue;
+                }
+
                 send(s[1]);
+            } else if (line.startsWith("status")) {
+                if (s.length < 2) {
+                    status(server);
+                } else {
+                    status(ServerFactory.getServer(s[1], 1));
+                }
             } else {
-                System.out.println("USAGE: send [MESSAGE]   |   changeaddr [addr]");
+                System.out.println("USAGE: send [MESSAGE]   |   changeaddr [addr]   |   status {addr}");
             }
 
 
         }
+    }
+
+    @SneakyThrows
+    void status(RPCServer server) {
+        System.out.println(server.status());
     }
 
     void changeAddr(String addr) {

@@ -35,8 +35,8 @@ public class RaftStatus implements RPCMessage {
         out.putLong(commited);
         out.putLong(logs.size());
         out.flip();
-        for (var l : logs) l.put(channel);
         channel.write(out);
+        for (var l : logs) l.put(channel);
     }
 
     @Override
